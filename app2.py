@@ -75,7 +75,7 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
                     reco.append("- Éviter la rétention prolongée")
                     reco.append("- Uriner régulièrement")
                 elif ipss > 7 and volume < 40:
-                    if actif == "Oui":
+                        if actif == "Oui":
                     reco.append("💊 Traitement médical par alpha-bloquant (ex. tamsulosine)")
                     reco.append("ℹ️ Justification : vie sexuelle active, éviter les inhibiteurs de la 5α-réductase")
                 else:
