@@ -206,6 +206,7 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
             reco.append("📆 RCP indispensable avant décision")
 
         if metastases == "Oui":
+    reco.append("📌 En cas de métastases : une biopsie rénale est indiquée avant tout traitement systémique")
             reco.append("🚨 Tumeur métastatique → chimiothérapie ou immunothérapie selon statut PD-L1")
             reco.append("📆 Suivi oncologique spécialisé")
 
@@ -417,6 +418,9 @@ if menu == "Tumeurs des voies excrétrices supérieures (TVES)":
 if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
+    comorbidites = st.radio("Comorbidités sévères contre-indiquant la chirurgie ?", ["Oui", "Non"])
+    st.header("🔷 Cancer du rein")
+    age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
     tumeur_kystique = st.radio("Tumeur d’aspect kystique au scanner ?", ["Oui", "Non"])
     if tumeur_kystique == "Oui":
         bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
@@ -442,6 +446,10 @@ if menu == "Cancer du rein":
             # Stade T selon taille
             if taille <= 4:
                 stade_t = "T1a"
+                if age > 75 and comorbidites == "Oui":
+                    reco.append("🛑 Surveillance active possible : patient > 75 ans avec comorbidités majeures")
+                    reco.append("📌 Protocole : TDM rénale tous les 3 mois pendant 1 an, puis tous les 6 mois pendant 2 ans, puis annuel")
+                    reco.append("📌 Une biopsie rénale est recommandée avant de confirmer cette stratégie")
             elif 4 < taille <= 7:
                 stade_t = "T1b"
             else:
@@ -457,6 +465,10 @@ if menu == "Cancer du rein":
                 reco.append("🟡 Tumeur intermédiaire (4-7 cm) : néphrectomie partielle si faisable, sinon totale selon balance bénéfices/risques (AFU)")
             else:
                 reco.append("🔴 Tumeur > 7 cm : néphrectomie totale recommandée + curage si ganglions visibles")
+            reco.append("📌 Rappel : une biopsie rénale est indiquée dans les cas suivants :")
+            reco.append("- NP techniquement difficile pour exclure une tumeur bénigne")
+            reco.append("- Incertitude diagnostique à l’imagerie (ex : lymphome, sarcome, pseudotumeur)")
+            reco.append("- Suspicion de métastase rénale d’une autre tumeur")
 
             reco.append("📊 Réaliser un scanner TAP ou IRM pour bilan d'extension")
             if taille <= 4:
