@@ -392,9 +392,11 @@ if menu == "Tumeurs des voies excrétrices supérieures (TVES)":
 if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
-    hematurie = st.radio("Hématurie présente ?", ["Oui", "Non"])
-    douleur = st.radio("Douleur lombaire ?", ["Oui", "Non"])
-    masse_palpable = st.radio("Masse palpable ?", ["Oui", "Non"])
+    tumeur_kystique = st.radio("Tumeur d’aspect kystique au scanner ?", ["Oui", "Non"])
+    if tumeur_kystique == "Oui":
+        bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
+    thrombus = st.radio("Présence de thrombus veineux ?", ["Non", "Veine rénale", "Veine cave inférieure infradiafragmatique", "Veine cave supradiafragmatique"])
+    gerota = st.radio("Extension au fascia de Gerota ou tissu périrénal ?", ["Oui", "Non"])
     taille = st.slider("Taille de la tumeur (cm)", min_value=1, max_value=20)
     later = st.radio("Côté atteint", ["Droit", "Gauche"])
     metastases = st.radio("Présence de métastases ?", ["Oui", "Non"])
