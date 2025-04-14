@@ -54,6 +54,4 @@ if menu == "Page d'accueil":
     st.info("Veuillez sélectionner une pathologie dans le menu pour commencer.")
 
 # 🔽 Les autres modules sont déjà définis dans le script existant. Aucun changement ici sauf l'ajout de thème.
-# Le reste du code (modules HBP, Lithiase, Prostate, Rein, etc.) reste inchangé pour cette étape esthétique.
-
-# ⚠️ Les modifications ci-dessus concernent uniquement le style visuel (couleurs, padding, titres, boutons).
+# Le reste du code (modules HBP, Lithiase, Prostate, Rein, etc.) r
