@@ -38,6 +38,9 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
     ipss = st.slider("Score IPSS", 0, 35)
     volume = st.number_input("Volume prostatique à l’échographie (cc)", min_value=10.0)
     psa = st.number_input("PSA total (ng/mL)", min_value=0.0)
+    psa_libre_val = 0.0
+    if 4 <= psa <= 10:
+        psa_libre_val = st.number_input("PSA libre (ng/mL)", min_value=0.0)
     residu = st.number_input("Résidu post-mictionnel (mL)", min_value=0.0)
     actif = st.radio("Activité sexuelle ?", ["Oui", "Non"])
     enfant = st.radio("Souhaite avoir des enfants ?", ["Oui", "Non"])
@@ -49,21 +52,25 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
         if psa < 4:
             diagnostic = "HBP probable"
         elif 4 <= psa <= 10:
-            psa_libre_val = st.number_input("PSA libre (ng/mL)", min_value=0.0)
             ratio_libre = psa_libre_val / psa if psa > 0 else 0
             densite = psa / volume if volume > 0 else 0
             if densite > 0.15 or ratio_libre < 0.15:
-                diagnostic = f"Suspicion d’ADK prostatique → IRM + biopsies (densité = {densite:.2f}, ratio libre = {ratio_libre:.2f})"
+                diagnostic = f"Suspicion d’ADK prostatique → IRM + biopsies"
+                reco.append(f"🔍 Justification : Densité = {densite:.2f}, Ratio libre = {ratio_libre:.2f}")
             else:
-                diagnostic = f"HBP probable (densité = {densite:.2f}, ratio libre = {ratio_libre:.2f})"
+                diagnostic = f"HBP probable"
+                reco.append(f"ℹ️ Densité = {densite:.2f}, Ratio libre = {ratio_libre:.2f}")
         else:
             diagnostic = "Suspicion forte d’ADK prostatique → IRM + biopsies"
 
         reco.append(f"🧬 Diagnostic : {diagnostic}")
 
         if diagnostic.startswith("HBP"):
-            if ipss <= 7:
-                reco.append("✅ Abstention thérapeutique + règles hygiéno-diététiques :")
+            if any(x in atcd for x in ["Échec de traitement médical", "Altération de la fonction rénale liée à l’obstacle"]):
+                pass  # pas de traitement médical proposé
+            else:
+                if ipss <= 7:
+                    reco.append("✅ Abstention thérapeutique + règles hygiéno-diététiques :")
                 reco.append("- Diminuer la caféine et alcool")
                 reco.append("- Éviter la rétention prolongée")
                 reco.append("- Uriner régulièrement")
@@ -89,8 +96,15 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
                 "Altération de la fonction rénale liée à l’obstacle",
                 "Échec de traitement médical"
             ]):
-                reco.append("🔧 Traitement chirurgical indiqué : complication ou échec du traitement médical")
-                reco.append("ℹ️ Justification : indication indépendante du volume selon les recommandations de l’AFU")
+                if volume < 30:
+                    reco.append("🔧 Traitement chirurgical : incision cervico-prostatique")
+                    reco.append("ℹ️ Justification : volume < 30 cc et complication présente")
+                elif 30 <= volume <= 70:
+                    reco.append("🔧 Traitement chirurgical : RTUP")
+                    reco.append("ℹ️ Justification : volume entre 30 et 70 cc avec complication")
+                else:
+                    reco.append("🔧 Traitement chirurgical : adénomectomie voie endoscopique ou ouverte")
+                    reco.append("ℹ️ Justification : volume > 70 cc avec complication ou échec médical")
 
         st.markdown("### 🧠 Recommandation IA - HBP")
         for r in reco:
