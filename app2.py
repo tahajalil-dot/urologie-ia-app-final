@@ -248,6 +248,13 @@ if menu == "Cancer de la prostate":
         else: g = 9
 
         if metastases == "Non":
+        if tumeur_kystique == "Oui":
+            if bosniak in ["I", "II"]:
+                reco.append("🟢 Bosniak I/II : surveillance simple selon les recommandations AFU")
+            elif bosniak == "IIF":
+                reco.append("🟡 Bosniak IIF : imagerie de contrôle tous les 6 mois")
+            else:
+                reco.append("🔴 Bosniak III/IV : indication chirurgicale selon les recommandations AFU")
             # Éléments T supplémentaires
             if thrombus != "Non":
                 reco.append(f"⚠️ Présence de thrombus veineux ({thrombus}) → Néphrectomie élargie possible")
@@ -400,13 +407,7 @@ if menu == "Cancer du rein":
     age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
     tumeur_kystique = st.radio("Tumeur d’aspect kystique au scanner ?", ["Oui", "Non"])
     if tumeur_kystique == "Oui":
-        bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
-        if bosniak in ["I", "II"]:
-            reco.append("🟢 Bosniak I/II : surveillance simple selon les recommandations AFU")
-        elif bosniak == "IIF":
-            reco.append("🟡 Bosniak IIF : imagerie de contrôle tous les 6 mois")
-        else:
-            reco.append("🔴 Bosniak III/IV : indication chirurgicale selon les recommandations AFU")
+    bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
     tumeur_kystique = st.radio("Tumeur d’aspect kystique au scanner ?", ["Oui", "Non"])
     if tumeur_kystique == "Oui":
         bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
