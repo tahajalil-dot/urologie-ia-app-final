@@ -53,10 +53,10 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
             densite = psa / volume if volume > 0 else 0
             if densite > 0.15:
                 diagnostic = f"Suspicion d’ADK prostatique → IRM + biopsies"
-                reco.append(f"🔍 Justification : Densité = {densite:.2f}")
+                reco.append(f"🔍 Justification : Densité prostatique élevée > 0.15 (densité = {densite:.2f}) → exploration complémentaire recommandée selon AFU")
             else:
                 diagnostic = f"HBP probable"
-                reco.append(f"ℹ️ Densité = {densite:.2f}")
+                reco.append(f"ℹ️ Densité prostatique < 0.15 (densité = {densite:.2f}) → compatible avec HBP selon AFU")
         else:
             diagnostic = "Suspicion forte d’ADK prostatique → IRM + biopsies"
 
@@ -256,17 +256,30 @@ if menu == "Cancer de la prostate":
             else:
                 risque = "intermédiaire"
 
-            reco.append(f"📊 Risque estimé : **{risque.upper()}** selon AFU")
+            reco.append(f"📊 Risque estimé : **{risque.upper()}** selon la classification de D'Amico (AFU)")
+            reco.append("🔍 Le score de D’Amico repose sur 3 critères : PSA, Gleason, et stade clinique.")
+            reco.append("- 🟢 Faible risque : les 3 critères suivants sont TOUS présents → PSA < 10, Gleason ≤ 6, T1c–T2a")
+            reco.append("- 🟠 Risque intermédiaire : au moins un critère → PSA 10–20, Gleason 7, T2b")
+            reco.append("- 🔴 Risque élevé : un SEUL critère suffit → PSA > 20, Gleason ≥ 8, T2c ou plus")
+            if risque == "faible":
+                reco.append("🟢 Critères : PSA < 10, Gleason ≤ 6, stade T1c-T2a")
+            elif risque == "intermédiaire":
+                reco.append("🟠 Critère : PSA 10–20, Gleason = 7, ou stade T2b")
+            else:
+                reco.append("🔴 Critère : PSA > 20, Gleason ≥ 8, ou stade ≥ T2c")
 
             if esperance == "Non":
                 reco.append("🛑 Espérance de vie < 10 ans → Surveillance ou hormonothérapie")
             else:
                 if risque == "faible":
-                    reco.append("✅ Surveillance active OU prostatectomie / radiothérapie selon préférence")
+                reco.append("✅ Surveillance active OU prostatectomie / radiothérapie")
+                reco.append("ℹ️ Justification : Cancer localisé à faible risque → toutes options possibles selon âge, comorbidités et souhait du patient (AFU)")
                 elif risque == "intermédiaire":
-                    reco.append("🔶 Prostatectomie avec curage pelvien ou Radiothérapie + HT courte (6 mois)")
+                reco.append("🔶 Prostatectomie avec curage pelvien ou Radiothérapie + HT courte (6 mois)")
+                reco.append("ℹ️ Justification : Risque intermédiaire → stratégie combinée selon recommandations AFU")
                 else:
-                    reco.append("🔴 Prostatectomie + curage étendu ou Radiothérapie + HT longue (18-36 mois)")
+                reco.append("🔴 Prostatectomie + curage étendu ou Radiothérapie + HT longue (18-36 mois)")
+                reco.append("ℹ️ Justification : Risque élevé → traitement intensif recommandé selon les guidelines AFU")
 
             if tnm in ["T3", "T4"] or vesi == "Oui":
                 reco.append("⚠️ Forme localement avancée : curage + HT prolongée + radiothérapie")
