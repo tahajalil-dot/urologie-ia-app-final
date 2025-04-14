@@ -1,10 +1,7 @@
 import streamlit as st
 st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
-
 import base64
 
-
-st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
 
 st.title("🧠 Assistant IA - Urologie (AFU)")
 st.markdown("""
