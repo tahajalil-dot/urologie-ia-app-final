@@ -81,7 +81,7 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
                     else:
                         reco.append("💊 Inhibiteur de la 5α-réductase (ex. finastéride)")
                         reco.append("ℹ️ Justification : absence de vie sexuelle active")
-            elif ipss > 7 and volume >= 40:
+                            elif ipss > 7 and volume >= 40:
                 if actif == "Oui":
                     reco.append("💊 Alpha-bloquant seul (ex. tamsulosine)")
                     reco.append("ℹ️ Justification : vie sexuelle active, éviter inhibiteur 5α-réductase")
