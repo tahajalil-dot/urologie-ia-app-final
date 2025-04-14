@@ -39,8 +39,7 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
     volume = st.number_input("Volume prostatique à l’échographie (cc)", min_value=10.0)
     psa = st.number_input("PSA total (ng/mL)", min_value=0.0)_val = 0.0
     if 4 <= psa <= 10:
-        psa_libre_val = st.number_input("PSA libre (ng/mL)", min_value=0.0)
-    residu = st.number_input("Résidu post-mictionnel (mL)", min_value=0.0)
+            residu = st.number_input("Résidu post-mictionnel (mL)", min_value=0.0)
     actif = st.radio("Activité sexuelle ?", ["Oui", "Non"])
     enfant = st.radio("Souhaite avoir des enfants ?", ["Oui", "Non"])
     marie = st.radio("Statut marital", ["Marié", "Célibataire"])
@@ -51,14 +50,13 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
         if psa < 4:
             diagnostic = "HBP probable"
         elif 4 <= psa <= 10:
-            ratio_libre = psa_libre_val / psa if psa > 0 else 0
             densite = psa / volume if volume > 0 else 0
-            if densite > 0.15 or ratio_libre < 0.15:
+            if densite > 0.15:
                 diagnostic = f"Suspicion d’ADK prostatique → IRM + biopsies"
-                reco.append(f"🔍 Justification : Densité = {densite:.2f}, Ratio libre = {ratio_libre:.2f}")
+                reco.append(f"🔍 Justification : Densité = {densite:.2f}")
             else:
                 diagnostic = f"HBP probable"
-                reco.append(f"ℹ️ Densité = {densite:.2f}, Ratio libre = {ratio_libre:.2f}")
+                reco.append(f"ℹ️ Densité = {densite:.2f}")
         else:
             diagnostic = "Suspicion forte d’ADK prostatique → IRM + biopsies"
 
@@ -253,10 +251,10 @@ if menu == "Cancer de la prostate":
         if metastases == "Non":
             if psa < 10 and g == 6 and tnm in ["T1c", "T2a"]:
                 risque = "faible"
-            elif 10 <= psa <= 20 or g == 7 or tnm == "T2b":
-                risque = "intermédiaire"
-            else:
+            elif psa >= 20 or g >= 8 or tnm in ["T2c", "T3", "T4"]:
                 risque = "élevé"
+            else:
+                risque = "intermédiaire"
 
             reco.append(f"📊 Risque estimé : **{risque.upper()}** selon AFU")
 
