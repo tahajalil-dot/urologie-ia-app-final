@@ -1,7 +1,9 @@
 import streamlit as st
-import base64
 
+# ✅ Cette ligne doit être absolument la toute première commande Streamlit
 st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
+
+import base64
 
 st.title("🧠 Assistant IA - Urologie (AFU)")
 st.markdown("""
