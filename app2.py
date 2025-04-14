@@ -3,7 +3,6 @@ st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
 
 import base64
 
-
 st.title("🧠 Assistant IA - Urologie (AFU)")
 st.markdown("""
 Bienvenue dans l'assistant intelligent pour la décision clinique en urologie. 
