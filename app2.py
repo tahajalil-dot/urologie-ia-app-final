@@ -419,8 +419,6 @@ if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
     comorbidites = st.radio("Comorbidités sévères contre-indiquant la chirurgie ?", ["Oui", "Non"])
-    st.header("🔷 Cancer du rein")
-    age = st.number_input("Âge du patient", min_value=18, max_value=100, step=1)
     tumeur_kystique = st.radio("Tumeur d’aspect kystique au scanner ?", ["Oui", "Non"])
     if tumeur_kystique == "Oui":
         bosniak = st.selectbox("Classification de Bosniak", ["I", "II", "IIF", "III", "IV"])
