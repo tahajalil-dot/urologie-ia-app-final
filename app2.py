@@ -67,7 +67,7 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
 
         if diagnostic.startswith("HBP"):
             if any(x in atcd for x in ["Échec de traitement médical", "Altération de la fonction rénale liée à l’obstacle"]):
-                pass  # pas de traitement médical proposé
+                pass
             else:
                 if ipss <= 7:
                     reco.append("✅ Abstention thérapeutique + règles hygiéno-diététiques :")
