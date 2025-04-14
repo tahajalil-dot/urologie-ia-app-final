@@ -126,19 +126,35 @@ if menu == "Lithiase urinaire":
         if colique == "Oui":
             reco.append("🚨 Colique néphrétique → antalgie, hydratation, éventuelle pose de JJ en urgence")
         else:
+            # Recommandations AFU selon taille, localisation et densité
+            if grossesse == "Oui" or rein_unique == "Oui":
+                reco.append("🔶 Patiente enceinte ou rein unique → URS en priorité")
+
             if taille <= 10:
-                reco.append("💠 ESWL en 1ère intention si densité < 1000 UH et localisation favorable")
-            if 10 < taille <= 20:
-                reco.append("🔷 URS ou mini-NLPC en fonction de la localisation")
-            if taille > 20:
-                reco.append("🔴 NLPC ou chirurgie combinée selon la complexité")
+                if densite < 1000:
+                    reco.append("💠 ESWL en 1ère intention si localisation favorable")
+                else:
+                    reco.append("🔸 URS préférée si densité > 1000 UH")
+            elif 10 < taille <= 20:
+                if localisation in ["Calice inférieur", "Bassinet"]:
+                    reco.append("🔷 Mini-NLPC préférable en cas de localisation peu favorable")
+                else:
+                    reco.append("🔷 URS en 1ère intention si localisation favorable")
+            elif taille > 20:
+                if nombre == "Multiple":
+                    reco.append("🟥 NLPC combinée à URS en cas de calculs complexes ou multiples")
+                else:
+                    reco.append("🔴 NLPC seule si volume > 20 mm et accès favorable")
+
+            if taille > 30:
+                reco.append("🔴 Calcul > 3 cm → NLPC possible OU chirurgie ouverte/laparoscopique selon anatomie et contexte")
+            if taille > 30 or localisation in ["Calice inférieur"]:
+                reco.append("⚠️ Chirurgie ouverte ou laparoscopique si échec traitements endo-urologiques ou anatomie défavorable")
 
         reco.append("📌 Règles hygiéno-diététiques pour prévenir la récidive :")
         reco.append("- Boire au moins 2,5L/j")
         reco.append("- Réduire sel, protéines animales")
         reco.append("- Éviter excès oxalates")
-
-        st.markdown("### 🧠 Recommandation IA - Lithiase urinaire")
         for r in reco:
             st.markdown(r)
         rapport = "\n".join(reco)
