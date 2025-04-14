@@ -206,7 +206,7 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
             reco.append("📆 RCP indispensable avant décision")
 
         if metastases == "Oui":
-        reco.append("📌 En cas de métastases : une biopsie rénale est indiquée avant tout traitement systémique")
+            reco.append("📌 En cas de métastases : une biopsie rénale est indiquée avant tout traitement systémique")
             reco.append("🚨 Tumeur métastatique → chimiothérapie ou immunothérapie selon statut PD-L1")
             reco.append("📆 Suivi oncologique spécialisé")
 
