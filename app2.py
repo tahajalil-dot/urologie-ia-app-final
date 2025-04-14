@@ -37,7 +37,7 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
 ])
     ipss = st.slider("Score IPSS", 0, 35)
     volume = st.number_input("Volume prostatique à l’échographie (cc)", min_value=10.0)
-    psa = st.number_input("PSA total (ng/mL)", min_value=0.0)_val = 0.0
+    psa = st.number_input("PSA total (ng/mL)", min_value=0.0)
     if 4 <= psa <= 10:
             residu = st.number_input("Résidu post-mictionnel (mL)", min_value=0.0)
     actif = st.radio("Activité sexuelle ?", ["Oui", "Non"])
@@ -224,7 +224,7 @@ if menu == "Cancer de la prostate":
     age = st.number_input("Âge du patient", min_value=40, max_value=100)
     psa = st.number_input("PSA total (ng/mL)", min_value=0.0, step=0.1)
     volume = st.number_input("Volume prostatique (cc)", min_value=10.0, step=1.0)
-        tr = st.selectbox("Résultat du toucher rectal", ["Normal", "Induré unilatéral", "Induré bilatéral", "Suspect diffus"])
+    tr = st.selectbox("Résultat du toucher rectal", ["Normal", "Induré unilatéral", "Induré bilatéral", "Suspect diffus"])
     pirads = st.selectbox("Score PIRADS de l’IRM", ["PIRADS 1", "PIRADS 2", "PIRADS 3", "PIRADS 4", "PIRADS 5"])
     esperance = st.radio("Espérance de vie > 10 ans ?", ["Oui", "Non"])
 
@@ -241,7 +241,6 @@ if menu == "Cancer de la prostate":
         reco = []
 
         # Détermination du risque (localisé)
-        psa_val = psa
         if gleason == "3+3": g = 6
         elif gleason == "3+4": g = 7
         elif gleason == "4+3": g = 7
