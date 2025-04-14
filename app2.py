@@ -74,26 +74,19 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
                     reco.append("- Diminuer la caféine et alcool")
                     reco.append("- Éviter la rétention prolongée")
                     reco.append("- Uriner régulièrement")
-                elif ipss > 7 and volume < 40:
+                elif ipss > 7:
                     if actif == "Oui" or enfant == "Oui":
                         reco.append("💊 Traitement médical par alpha-bloquant (ex. tamsulosine)")
-                        reco.append("ℹ️ Justification : vie sexuelle active, éviter les inhibiteurs de la 5α-réductase")
+                        reco.append("ℹ️ Justification : vie sexuelle active ou désir d’enfant → éviter inhibiteurs de la 5α-réductase")
                     else:
                         reco.append("💊 Inhibiteur de la 5α-réductase (ex. finastéride)")
-                        reco.append("ℹ️ Justification : absence de vie sexuelle active")
-                elif ipss > 7 and volume >= 40:
-                    if actif == "Oui" or enfant == "Oui":
+                        reco.append("ℹ️ Justification : pas de vie sexuelle active ni désir d’enfant → inhibiteur possible")if actif == "Oui" or enfant == "Oui":
                         reco.append("💊 Alpha-bloquant seul (ex. tamsulosine)")
                         reco.append("ℹ️ Justification : vie sexuelle active, éviter inhibiteur 5α-réductase")
                     else:
                         reco.append("💊 Inhibiteur 5α-réductase ± alpha-bloquant")
                         reco.append("ℹ️ Justification : absence de vie sexuelle active")
-                if actif == "Oui":
-                    reco.append("💊 Alpha-bloquant seul (ex. tamsulosine)")
-                    reco.append("ℹ️ Justification : vie sexuelle active, éviter inhibiteur 5α-réductase")
-                else:
-                    reco.append("💊 Inhibiteur 5α-réductase ± alpha-bloquant")
-                    reco.append("ℹ️ Justification : absence de vie sexuelle active")
+                
             if any(x in atcd for x in [
                 "Rétention urinaire aiguë",
                 "Infections urinaires récidivantes",
