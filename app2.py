@@ -271,13 +271,13 @@ if menu == "Cancer de la prostate":
                 reco.append("🛑 Espérance de vie < 10 ans → Surveillance ou hormonothérapie")
             else:
                 if risque == "faible":
-                reco.append("✅ Surveillance active OU prostatectomie / radiothérapie")
+                    reco.append("✅ Surveillance active OU prostatectomie / radiothérapie")
                 reco.append("ℹ️ Justification : Cancer localisé à faible risque → toutes options possibles selon âge, comorbidités et souhait du patient (AFU)")
                 elif risque == "intermédiaire":
-                reco.append("🔶 Prostatectomie avec curage pelvien ou Radiothérapie + HT courte (6 mois)")
+                    reco.append("🔶 Prostatectomie avec curage pelvien ou Radiothérapie + HT courte (6 mois)")
                 reco.append("ℹ️ Justification : Risque intermédiaire → stratégie combinée selon recommandations AFU")
                 else:
-                reco.append("🔴 Prostatectomie + curage étendu ou Radiothérapie + HT longue (18-36 mois)")
+                    reco.append("🔴 Prostatectomie + curage étendu ou Radiothérapie + HT longue (18-36 mois)")
                 reco.append("ℹ️ Justification : Risque élevé → traitement intensif recommandé selon les guidelines AFU")
 
             if tnm in ["T3", "T4"] or vesi == "Oui":
