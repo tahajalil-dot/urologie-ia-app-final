@@ -27,7 +27,14 @@ if menu == "Page d'accueil":
 if menu == "Hypertrophie bénigne de la prostate (HBP)":
     st.header("🔷 Hypertrophie bénigne de la prostate (HBP)")
     age = st.number_input("Âge", min_value=40, max_value=100)
-    atcd = st.text_input("Antécédents urologiques")
+    atcd = st.multiselect("Antécédents urologiques", [
+    "Rétention urinaire aiguë",
+    "Infections urinaires récidivantes",
+    "Calculs vésicaux",
+    "Hématurie récidivante",
+    "Altération de la fonction rénale liée à l’obstacle",
+    "Échec de traitement médical"
+])
     ipss = st.slider("Score IPSS", 0, 35)
     volume = st.number_input("Volume prostatique à l’échographie (cc)", min_value=10.0)
     psa = st.number_input("PSA total (ng/mL)", min_value=0.0)
@@ -42,12 +49,13 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
         if psa < 4:
             diagnostic = "HBP probable"
         elif 4 <= psa <= 10:
-            densite = psa / volume
-            ratio_libre = st.number_input("Ratio PSA libre / total", min_value=0.0, max_value=1.0)
+            psa_libre_val = st.number_input("PSA libre (ng/mL)", min_value=0.0)
+            ratio_libre = psa_libre_val / psa if psa > 0 else 0
+            densite = psa / volume if volume > 0 else 0
             if densite > 0.15 or ratio_libre < 0.15:
-                diagnostic = "Suspicion d’ADK prostatique → IRM + biopsies"
+                diagnostic = f"Suspicion d’ADK prostatique → IRM + biopsies (densité = {densite:.2f}, ratio libre = {ratio_libre:.2f})"
             else:
-                diagnostic = "HBP probable"
+                diagnostic = f"HBP probable (densité = {densite:.2f}, ratio libre = {ratio_libre:.2f})"
         else:
             diagnostic = "Suspicion forte d’ADK prostatique → IRM + biopsies"
 
@@ -60,11 +68,29 @@ if menu == "Hypertrophie bénigne de la prostate (HBP)":
                 reco.append("- Éviter la rétention prolongée")
                 reco.append("- Uriner régulièrement")
             elif ipss > 7 and volume < 40:
-                reco.append("💊 Traitement médical par alpha-bloquant (ex. tamsulosine)")
+                if actif == "Oui":
+                    reco.append("💊 Traitement médical par alpha-bloquant (ex. tamsulosine)")
+                    reco.append("ℹ️ Justification : vie sexuelle active, éviter les inhibiteurs de la 5α-réductase")
+                else:
+                    reco.append("💊 Inhibiteur de la 5α-réductase (ex. finastéride)")
+                    reco.append("ℹ️ Justification : absence de vie sexuelle active")
             elif ipss > 7 and volume >= 40:
-                reco.append("💊 Inhibiteur 5α-réductase (finastéride) ± alpha-bloquant selon profil")
-            if volume > 80:
-                reco.append("🔧 Traitement chirurgical : adénomectomie par voie ouverte ou endoscopique")
+                if actif == "Oui":
+                    reco.append("💊 Alpha-bloquant seul (ex. tamsulosine)")
+                    reco.append("ℹ️ Justification : vie sexuelle active, éviter inhibiteur 5α-réductase")
+                else:
+                    reco.append("💊 Inhibiteur 5α-réductase ± alpha-bloquant")
+                    reco.append("ℹ️ Justification : absence de vie sexuelle active")
+            if any(x in atcd for x in [
+                "Rétention urinaire aiguë",
+                "Infections urinaires récidivantes",
+                "Calculs vésicaux",
+                "Hématurie récidivante",
+                "Altération de la fonction rénale liée à l’obstacle",
+                "Échec de traitement médical"
+            ]):
+                reco.append("🔧 Traitement chirurgical indiqué : complication ou échec du traitement médical")
+                reco.append("ℹ️ Justification : indication indépendante du volume selon les recommandations de l’AFU")
 
         st.markdown("### 🧠 Recommandation IA - HBP")
         for r in reco:
