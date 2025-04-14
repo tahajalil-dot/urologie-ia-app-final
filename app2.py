@@ -1,6 +1,9 @@
 import streamlit as st
 import base64
 
+# ✅ Cette ligne doit venir juste après les imports
+st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
+
 # 💡 Thème clair et esthétique modernisé
 st.markdown("""
     <style>
@@ -29,8 +32,6 @@ st.markdown("""
         }
     </style>
 """, unsafe_allow_html=True)
-
-st.set_page_config(page_title="Assistant IA - Urologie (AFU)", layout="wide")
 
 st.title("🧠 Assistant IA - Urologie (AFU)")
 st.markdown("""
