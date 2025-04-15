@@ -240,13 +240,13 @@ if menu == "Cancer de la prostate":
     if st.button("🔎 Générer la conduite à tenir - Prostate"):
         reco = []
 
-        # Détermination du risque (localisé)
         if gleason == "3+3": g = 6
         elif gleason == "3+4": g = 7
         elif gleason == "4+3": g = 7
         elif gleason == "4+4": g = 8
         else: g = 9
 
+        if metastases == "Non":
             if psa < 10 and g == 6 and tnm in ["T1c", "T2a"]:
                 risque = "faible"
             elif psa >= 20 or g >= 8 or tnm in ["T2c", "T3", "T4"]:
@@ -259,12 +259,6 @@ if menu == "Cancer de la prostate":
             reco.append("- 🟢 Faible risque : les 3 critères suivants sont TOUS présents → PSA < 10, Gleason ≤ 6, T1c–T2a")
             reco.append("- 🟠 Risque intermédiaire : au moins un critère → PSA 10–20, Gleason 7, T2b")
             reco.append("- 🔴 Risque élevé : un SEUL critère suffit → PSA > 20, Gleason ≥ 8, T2c ou plus")
-            if risque == "faible":
-                reco.append("🟢 Critères : PSA < 10, Gleason ≤ 6, stade T1c-T2a")
-            elif risque == "intermédiaire":
-                reco.append("🟠 Critère : PSA 10–20, Gleason = 7, ou stade T2b")
-            else:
-                reco.append("🔴 Critère : PSA > 20, Gleason ≥ 8, ou stade ≥ T2c")
 
             if esperance == "Non":
                 reco.append("🛑 Espérance de vie < 10 ans → Surveillance ou hormonothérapie")
@@ -303,7 +297,6 @@ if menu == "Cancer de la prostate":
         st.markdown(href, unsafe_allow_html=True)
 
 # MODULE CANCER DU REIN
-if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100)
     comorbidites = ""
@@ -328,7 +321,7 @@ if menu == "Cancer du rein":
 
         if tumeur_kystique == "Oui":
             if bosniak in ["I", "II"]:
-                reco.append("🟢 Bosniak I/II : kystes bénins, aucune surveillance nécessaire selon les recommandations AFU")
+                reco.append("🟢 Bosniak I/II : kystes bénins, aucune surveillance nécessaire")
             elif bosniak == "IIF":
                 reco.append("🟡 Bosniak IIF : surveillance annuelle pendant 5 ans par imagerie à la recherche de rehaussement")
             elif bosniak in ["III", "IV"]:
