@@ -297,7 +297,7 @@ if menu == "Cancer de la prostate":
         st.markdown(href, unsafe_allow_html=True)
 
 # MODULE CANCER DU REIN
-   if menu == "Cancer du rein":
+if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100)
     comorbidites = ""
