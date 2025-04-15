@@ -247,32 +247,6 @@ if menu == "Cancer de la prostate":
         elif gleason == "4+4": g = 8
         else: g = 9
 
-        if metastases == "Non":
-            if tumeur_kystique == "Oui":
-                if bosniak in ["I", "II"]:
-                    reco.append("🟢 Bosniak I/II : surveillance simple selon les recommandations AFU")
-                elif bosniak == "IIF":
-                    reco.append("🟡 Bosniak IIF : imagerie de contrôle tous les 6 mois")
-                else:
-                    reco.append("🔴 Bosniak III/IV : indication chirurgicale selon les recommandations AFU")
-            if thrombus != "Non":
-                reco.append(f"⚠️ Présence de thrombus veineux ({thrombus}) → Néphrectomie élargie possible")
-            if gerota == "Oui":
-                reco.append("⚠️ Extension au fascia de Gerota → T4 probable → chirurgie élargie")
-            reco.append("📌 Indication de biopsie si doute histologique ou stratégie conservatrice envisagée")
-        if tumeur_kystique == "Oui":
-            if bosniak in ["I", "II"]:
-                reco.append("🟢 Bosniak I/II : surveillance simple selon les recommandations AFU")
-            elif bosniak == "IIF":
-                reco.append("🟡 Bosniak IIF : imagerie de contrôle tous les 6 mois")
-            else:
-                reco.append("🔴 Bosniak III/IV : indication chirurgicale selon les recommandations AFU")
-            # Éléments T supplémentaires
-            if thrombus != "Non":
-                reco.append(f"⚠️ Présence de thrombus veineux ({thrombus}) → Néphrectomie élargie possible")
-            if gerota == "Oui":
-                reco.append("⚠️ Extension au fascia de Gerota → T4 probable → chirurgie élargie")
-            reco.append("📌 Indication de biopsie si doute histologique ou stratégie conservatrice envisagée")
             if psa < 10 and g == 6 and tnm in ["T1c", "T2a"]:
                 risque = "faible"
             elif psa >= 20 or g >= 8 or tnm in ["T2c", "T3", "T4"]:
