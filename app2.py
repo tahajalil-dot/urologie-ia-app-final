@@ -300,13 +300,12 @@ if menu == "Cancer de la prostate":
 if menu == "Cancer du rein":
     st.header("🔷 Cancer du rein")
     age = st.number_input("Âge du patient", min_value=18, max_value=100)
-    comorbidites = ""
+    comorbidites = "Non"
     if age >= 75:
         comorbidites = st.radio("Comorbidités contre-indiquant la chirurgie ?", ["Oui", "Non"])
 
     taille = st.slider("Taille de la tumeur (cm)", 1, 20)
     tumeur_kystique = st.radio("Aspect kystique au scanner ?", ["Oui", "Non"])
-
     if tumeur_kystique == "Oui":
         bosniak = st.selectbox("Classification Bosniak", ["I", "II", "IIF", "III", "IV"])
 
@@ -315,7 +314,13 @@ if menu == "Cancer du rein":
     metastases = st.radio("Présence de métastases ?", ["Oui", "Non"])
 
     if metastases == "Oui":
-        mscck_score = st.selectbox("Score pronostique MSKCC", ["Bon", "Intermédiaire", "Mauvais"])
+        st.subheader("Formulaire MSKCC (cancer du rein métastatique)")
+        karnofsky = st.radio("Score de Karnofsky < 80% ?", ["Oui", "Non"])
+        diag_delai = st.radio("Intervalle < 1 an entre diagnostic et traitement ?", ["Oui", "Non"])
+        anemia = st.radio("Anémie présente ?", ["Oui", "Non"])
+        hypercalc = st.radio("Hypercalcémie ?", ["Oui", "Non"])
+        neutros = st.radio("Polynucléose neutrophile ?", ["Oui", "Non"])
+        thrombose = st.radio("Thrombocytose ?", ["Oui", "Non"])
 
     if st.button("🔎 Générer la conduite à tenir - Rein"):
         reco = []
@@ -326,12 +331,34 @@ if menu == "Cancer du rein":
             elif bosniak == "IIF":
                 reco.append("🟡 Bosniak IIF : surveillance annuelle pendant 5 ans par imagerie à la recherche de rehaussement")
             elif bosniak in ["III", "IV"]:
-                reco.append("🔴 Bosniak III/IV : exérèse chirurgicale recommandée selon les règles oncologiques (risque de malignité élevé)")
+                reco.append("🔴 Bosniak III/IV : exérèse chirurgicale recommandée selon les règles oncologiques")
         else:
             if metastases == "Oui":
                 reco.append("📌 En cas de métastases : une biopsie rénale est indiquée avant tout traitement systémique")
-                reco.append("🚨 Tumeur métastatique → chimiothérapie ou immunothérapie selon statut PD-L1")
-                reco.append("📆 Suivi oncologique spécialisé")
+                nb_facteurs = sum([
+                    karnofsky == "Oui",
+                    diag_delai == "Oui",
+                    anemia == "Oui",
+                    hypercalc == "Oui",
+                    neutros == "Oui",
+                    thrombose == "Oui"
+                ])
+                if nb_facteurs == 0:
+                    risque = "bon pronostic"
+                elif nb_facteurs <= 2:
+                    risque = "intermédiaire"
+                else:
+                    risque = "mauvais pronostic"
+                reco.append(f"🧪 Score MSKCC : {nb_facteurs} facteur(s) → **{risque.upper()}**")
+                if risque in ["bon pronostic", "intermédiaire"]:
+                    reco.append("🔄 Option de néphrectomie cytoréductrice à discuter en RCP si état général stable")
+                if risque == "bon pronostic":
+                    reco.append("💊 Traitement recommandé : Double immunothérapie (Nivolumab + Ipilimumab) OU Sunitinib")
+                elif risque == "intermédiaire":
+                    reco.append("💊 Traitement recommandé : Association TKI + Anti-PD1 (ex. Cabozantinib + Nivolumab)")
+                else:
+                    reco.append("💊 Traitement recommandé : TKI seul (Pazopanib, Sunitinib) ou combinaison si tolérée")
+                reco.append("📆 Suivi rapproché en RCP spécialisée")
             elif age >= 75 and comorbidites == "Oui" and taille <= 4:
                 reco.append("🟡 Surveillance active possible pour tumeur < 4cm chez sujet âgé avec comorbidités")
                 reco.append("📌 Biopsie rénale recommandée avant surveillance : TDM à 3 mois, puis 6 mois x2, puis annuel")
