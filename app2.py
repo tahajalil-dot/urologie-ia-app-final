@@ -328,6 +328,65 @@ if menu == "Cancer de la prostate":
         href = f'<a href="data:file/txt;base64,{b64}" download="recommandation_PROSTATE_AFU.txt">📥 Télécharger cette recommandation</a>'
         st.markdown(href, unsafe_allow_html=True)
 
+# MODULE CANCER DU REIN
+if menu == "Cancer du rein":
+    st.header("🔷 Cancer du rein")
+    age = st.number_input("Âge du patient", min_value=18, max_value=100)
+    comorbidites = ""
+    if age >= 75:
+        comorbidites = st.radio("Comorbidités contre-indiquant la chirurgie ?", ["Oui", "Non"])
+
+    taille = st.slider("Taille de la tumeur (cm)", 1, 20)
+    tumeur_kystique = st.radio("Aspect kystique au scanner ?", ["Oui", "Non"])
+
+    if tumeur_kystique == "Oui":
+        bosniak = st.selectbox("Classification Bosniak", ["I", "II", "IIF", "III", "IV"])
+
+    thrombus = st.radio("Présence de thrombus ?", ["Oui", "Non"])
+    fascia = st.radio("Extension au fascia de Gerota ?", ["Oui", "Non"])
+    metastases = st.radio("Présence de métastases ?", ["Oui", "Non"])
+
+    if metastases == "Oui":
+        mscck_score = st.selectbox("Score pronostique MSKCC", ["Bon", "Intermédiaire", "Mauvais"])
+
+    if st.button("🔎 Générer la conduite à tenir - Rein"):
+        reco = []
+
+        if tumeur_kystique == "Oui":
+            if bosniak in ["I", "II"]:
+                reco.append("🟢 Bosniak I/II : kystes bénins, aucune surveillance nécessaire selon les recommandations AFU")
+            elif bosniak == "IIF":
+                reco.append("🟡 Bosniak IIF : surveillance annuelle pendant 5 ans par imagerie à la recherche de rehaussement")
+            elif bosniak in ["III", "IV"]:
+                reco.append("🔴 Bosniak III/IV : exérèse chirurgicale recommandée selon les règles oncologiques (risque de malignité élevé)")
+        else:
+            if metastases == "Oui":
+                reco.append("📌 En cas de métastases : une biopsie rénale est indiquée avant tout traitement systémique")
+                reco.append("🚨 Tumeur métastatique → chimiothérapie ou immunothérapie selon statut PD-L1")
+                reco.append("📆 Suivi oncologique spécialisé")
+            elif age >= 75 and comorbidites == "Oui" and taille <= 4:
+                reco.append("🟡 Surveillance active possible pour tumeur < 4cm chez sujet âgé avec comorbidités")
+                reco.append("📌 Biopsie rénale recommandée avant surveillance : TDM à 3 mois, puis 6 mois x2, puis annuel")
+            elif taille <= 4:
+                reco.append("✅ Tumeur solide < 4cm : néphrectomie partielle si possible")
+            elif 4 < taille <= 7:
+                reco.append("📌 Tumeur solide 4-7cm : traitement conservateur si faisable, sinon néphrectomie totale")
+            elif taille > 7:
+                reco.append("🔴 Tumeur solide > 7cm : néphrectomie totale recommandée")
+
+        if thrombus == "Oui" or fascia == "Oui":
+            reco.append("⚠️ Présence de thrombus ou extension locale → imagerie complémentaire, RCP spécialisée")
+
+        reco.append("🔬 Biopsie à envisager en cas d’incertitude diagnostique (sarcome, lymphome, pseudotumeur)")
+
+        st.markdown("### 🧠 Recommandation IA - Cancer du rein")
+        for r in reco:
+            st.markdown(r)
+        rapport = "\n".join(reco)
+        b64 = base64.b64encode(rapport.encode()).decode()
+        href = f'<a href="data:file/txt;base64,{b64}" download="recommandation_REIN_AFU.txt">📥 Télécharger cette recommandation</a>'
+        st.markdown(href, unsafe_allow_html=True)
+
 # MODULE SONDE DOUBLE J
 if menu == "Patient porteur de sonde double J":
     st.header("🔷 Patient porteur de sonde double J")
