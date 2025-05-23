@@ -189,7 +189,7 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
                 risque = "haut"
             elif stade == "pT1" and grade == "Haut grade" or "pT1" and grade == "Haut grade"and nombre_tumeurs == "Multiple" or "pT1" and grade == "Haut grade" and taille > 30 or "pT1" and grade == "Haut grade" and  cis == "oui":
                 risque = "très haut"
-            elif stade == "pT2 ou plus" and and grade == "Haut grade" or "pT1" and grade == "Haut grade"and nombre_tumeurs == "Multiple" or "pT1" and grade == "Haut grade" and taille > 30 or "pT1" and grade == "Haut grade" and  cis == "oui":
+            elif stade == "pT2 ou plus" and grade == "Haut grade" or "pT1" and grade == "Haut grade"and nombre_tumeurs == "Multiple" or "pT1" and grade == "Haut grade" and taille > 30 or "pT1" and grade == "Haut grade" and  cis == "oui":
                 risque = "Tumeur infiltrante le muscle"
 
             reco.append(f"📊 Risque estimé : **{risque.upper()}**")
