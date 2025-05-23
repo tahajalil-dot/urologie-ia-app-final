@@ -195,8 +195,8 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
             reco.append(f"📊 Risque estimé : **{risque.upper()}**")
 
             if risque == "faible":
-                reco.append("💧 Instillation unique de mitomycine dans les 6h post RTUV")
-                reco.append("📆 Surveillance cystoscopie à 3 mois, puis tous les 6 mois")
+                reco.append("💧 correspondent aux tumeurs urothéliales pTa de bas grade, unifocales et de moins de 3 cm sans antécédent de TV. Elles ont un risque de récidive et de progression qui est faible. Après la résection de ces tumeurs il est recommandé de réaliser une IPOP. Aucun autre traitement complémentaire n’est nécessaire.")
+                reco.append("📆 Surveillance cystoscopie à 3 mois, puis au 12 eme mois et annuel pendant 5 ans")
             elif risque == "intermédiaire":
                 reco.append("💉 BCG 1 an OU mitomycine hebdomadaire x6 + entretien")
                 reco.append("📆 Surveillance cystoscopie à 3 mois, 6 mois, puis tous les 6 mois")
