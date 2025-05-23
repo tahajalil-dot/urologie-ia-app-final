@@ -187,10 +187,10 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
                 risque = "intermédiaire"
             elif stade == "pT1" or grade == "Haut grade" or cis == "Oui":
                 risque = "haut"
-            elif stade == "pT2 ou plus":
+            elif stade == "pT1" and grade == "Haut grade" or "pT1" and grade == "Haut grade"and nombre_tumeurs == "Multiple" or "pT1" and grade == "Haut grade" and taille > 30 or "pT1" and grade == "Haut grade" and  cis == "oui":
                 risque = "très haut"
-            else:
-                risque = "non classé"
+            else stade == "pT2"
+                risque = "Tumeur infiltrante le muscle"
 
             reco.append(f"📊 Risque estimé : **{risque.upper()}**")
 
@@ -198,16 +198,20 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
                 reco.append("💧 correspondent aux tumeurs urothéliales pTa de bas grade, unifocales et de moins de 3 cm sans antécédent de TV. Elles ont un risque de récidive et de progression qui est faible. Après la résection de ces tumeurs il est recommandé de réaliser une IPOP. Aucun autre traitement complémentaire n’est nécessaire.")
                 reco.append("📆 Surveillance cystoscopie à 3 mois, puis au 12 eme mois et annuel pendant 5 ans")
             elif risque == "intermédiaire":
-                reco.append("💉 BCG 1 an OU mitomycine hebdomadaire x6 + entretien")
-                reco.append("📆 Surveillance cystoscopie à 3 mois, 6 mois, puis tous les 6 mois")
+                reco.append("💉 correspondent à toutes les autres tumeurs urothéliales pTa de bas grade qui ne présentent aucun des critères de risque élevé ou très élevé. Ces tumeurs ont un risque de progression faible mais un risque de récidive élevé. Leur traitement fait appel aux instillations endovésicales par chimiothérapie (mitomycine, epirubicine) selon un schéma de 8 instillations sans traitement d’entretien. Une alternative thérapeutique est la BCG-thérapie avec un entretien de 1 an [54] pour diminuer le risque de récidive. Le BCG est plus efficace sur le risque de récidive, mais son profil de tolérance étant moins bon et le risque de progression étant faible, il est recommandé de proposer une chimiothérapie endovésicale en première intention et le BCG avec un traitement d’entretien d’un an en cas d’échec")
+                reco.append("📆 Surveillance cystoscopie à 3 mois, 6 mois, puis tous les 6 mois pendant 2 ans puis annuelement pendant 10 ans + cytologie urinaire")
             elif risque == "haut":
-                reco.append("💉 BCG thérapeutique sur 3 ans (induction + entretien)")
-                reco.append("🔄 Second look à 4-6 semaines si pT1 ou incertitude")
-                reco.append("📆 Surveillance rapprochée : cystoscopie tous les 3 mois la 1ère année")
+                reco.append("💉 au moins un des facteurs de risque suivant : stade pT1, haut grade, présence de carcinome in situ (CIS). Ces tumeurs ont un risque de récidive et de progression élevé. Leur traitement fait appel aux instillations endovésicales par BCG-thérapie (traitement initial par 6 instillations) suivi systématiquement par un traitement d’entretien de 3 ans (schéma d’entretien)")
+                reco.append("🔄 Second look à 4-6 semaines si pT1 ou Absence de muscle identifié sur la résection initiale ou Tumeur volumineuse et/ou multifocale")
+                reco.append("📆 Surveillance rapprochée : cystoscopie tous les 3 mois pendant 2 ans puis tous les 6 mois pendant 5 ans et puis anuellement a vie + cytologie urinaire.")
             elif risque == "très haut":
-                reco.append("⚠️ Indication de cystectomie totale si envahissement musculaire confirmé")
-                reco.append("📊 Bilan d’extension : TDM TAP, scintigraphie osseuse / TEP scan")
+                reco.append("⚠️ ont un risque de progression élevé (environ 20%), soit parce que la probabilité d’éradication complète avant traitement est faible,  parce qu’elles sont très agressives,et présentent un risque d’échec du traitement endovésical élevé. La BCG-thérapie et la cystectomie associée à un curage ganglionnaire sont les deux options thérapeutiques de première intention")
+                reco.append("📊 Surveillance rapprochée : cystoscopie tous les 3 mois pendant 2 ans puis tous les 6 mois pendant 5 ans et puis anuellement a vie + cytologie urinaire. en cas de cystectomie , Bilan d’extension : TDM TAP, scintigraphie osseuse / TEP scan")
                 reco.append("📆 RCP indispensable avant décision")
+            elif risque == "Tumeur infiltrante le muscle":
+                reco.append("⚠️ Tumeur infiltrante le muscle pT2 : chimiotherapie neo-adjuvante puis traitement chirurgical : cystectomie")
+                reco.append("📊 Bilan d’extension : TDM TAP, scintigraphie osseuse / TEP scan")
+                reco.append("📆 RCP indispensable avant décision si tumeur de vessie metastatique")
 
             st.markdown("### 🧠 Recommandation IA - Cancer de la vessie")
             for r in reco:
