@@ -84,8 +84,10 @@ def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str
 def plan_tvnim(risque: str):
     if risque == "faible":
         traitement = [
-            "RTUV complète et profonde (présence de détrusor au compte rendu).",
-            "Instillation postopératoire précoce (IPOP) dans les 2 h si pas de CI (mitomycine/épirubicine/gemcitabine).",
+            "RTUV complète et profonde (présence de détrusor au compte rendu anathomopathologique).",
+            "Après la résection de ces tumeurs, il est recom-
+mandé de réaliser une Instillation postopératoire précoce (IPOP) dans les 2 h si pas de CI (mitomycine/épirubicine/gemcitabine). Aucun autre traitement
+complémentaire n'est nécessaire..",
         ]
         suivi = [
             "Cystoscopie : 3e et 12e mois, puis 1×/an pendant 5 ans.",
