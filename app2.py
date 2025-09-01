@@ -76,23 +76,50 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
         with cols[1]:
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
 
+# =========================
+# IMAGE DES PROTOCOLES (BCG / MMC) — URL / LOCAL / UPLOAD
+# =========================
+# 👉 COLLE ICI l’URL "Raw" de ton image (format .png/.jpg) :
+# Exemple de forme :
+#   https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/protocoles_tvnim.png
+PROTO_URL = ""  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< COLLE TON URL ICI ENTRE GUILLEMETS
 
-# =========================
-# IMAGE DES PROTOCOLES (BCG / MMC) — IMAGE EMBARQUÉE
-# =========================
-# Ton image "Capture d’écran 2025-09-01 à 12.19.54.png" encodée ici en base64
-# (pas besoin d'assets ni d'upload)
-EMBEDDED_PROTO_IMG_B64 = """
-iVBORw0KGgoAAAANSUhEUgAA...TRONQUE_POUR_LISIBILITÉ...AAAASUVORK5CYII=
-""".strip()
+# Chemins locaux possibles dans le repo (au cas où tu ajoutes le fichier dans GitHub)
+CANDIDATE_PATHS = [
+    Path(__file__).parent / "assets" / "protocoles_tvnim.png",  # assets/protocoles_tvnim.png
+    Path(__file__).parent / "protocoles_tvnim.png",             # ./protocoles_tvnim.png (racine)
+]
 
 def show_protocol_image():
-    try:
-        img_bytes = base64.b64decode(EMBEDDED_PROTO_IMG_B64)
-        st.image(img_bytes, use_container_width=True,
-                 caption="Schéma des protocoles (BCG / MMC)")
-    except Exception:
-        st.warning("Impossible d’afficher l’image embarquée.")
+    """
+    Ordre de recherche :
+    A) PROTO_URL (si renseignée)  ➜ st.image(URL)
+    B) Fichier local (assets/… ou racine) ➜ st.image(path)
+    C) Uploader ➜ st.image(upload)
+    """
+    if PROTO_URL.strip():
+        try:
+            st.image(PROTO_URL.strip(), use_container_width=True, caption="Schéma des protocoles (chargé via URL)")
+            return
+        except Exception:
+            st.warning("Échec du chargement via l’URL fournie. On tente les fichiers locaux…")
+
+    for p in CANDIDATE_PATHS:
+        if p.exists():
+            st.image(str(p), use_container_width=True, caption=f"Schéma des protocoles (trouvé : {p.name})")
+            return
+
+    up = st.file_uploader("📎 Importer l'image des protocoles (png/jpg)", type=["png", "jpg", "jpeg"])
+    if up is not None:
+        st.image(up, use_container_width=True, caption="Schéma des protocoles (image téléversée)")
+    else:
+        st.info(
+            "Aucune image trouvée.\n\n"
+            "Solutions :\n"
+            "• Collez l’URL Raw de l’image dans PROTO_URL (ligne indiquée dans le code),\n"
+            "• ou ajoutez le fichier dans le repo (assets/protocoles_tvnim.png ou ./protocoles_tvnim.png),\n"
+            "• ou importez l’image via le bouton ci-dessus."
+        )
 
 # =========================
 # LOGIQUE CLINIQUE — TVNIM (AFU)
@@ -118,7 +145,7 @@ def plan_tvnim(risque: str):
     Retourne (traitement, suivi, protocoles, notes_second_look)
     Protocoles & doses usuelles (à adapter au contexte local / RCP).
     """
-    # Notes RTUV second look — A AFFICHER POUR TOUS les cas si un critère est présent
+    # Notes RTUV second look — À rappeler quel que soit le risque (si critères présents)
     notes_second_look = [
         "RTUV de second look recommandée si :",
         "• Tumeur pT1 (réévaluation systématique).",
@@ -210,7 +237,6 @@ def plan_tvnim(risque: str):
 
     return traitement, suivi, protocoles, notes_second_look
 
-
 # =========================
 # EXPORTS (HTML / TXT)
 # =========================
@@ -253,7 +279,6 @@ def offer_exports(report_text: str):
     b64_txt = base64.b64encode(report_text.encode()).decode()
     st.markdown(f'<a href="data:text/html;base64,{b64_html}" download="CAT_TVNIM.html">📄 Télécharger en HTML</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="CAT_TVNIM.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
-
 
 # =========================
 # PAGES
