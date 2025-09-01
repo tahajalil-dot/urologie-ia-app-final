@@ -80,22 +80,22 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
 # IMAGE DES PROTOCOLES (BCG / MMC) — URL / LOCAL / UPLOAD
 # =========================
 # 👉 COLLE ICI l’URL "Raw" de ton image (format .png/.jpg) :
-# Exemple de forme :
+# Exemple :
 #   https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/protocoles_tvnim.png
 PROTO_URL = ""  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< COLLE TON URL ICI ENTRE GUILLEMETS
 
-# Chemins locaux possibles dans le repo (au cas où tu ajoutes le fichier dans GitHub)
+# Chemins locaux possibles (si tu ajoutes l’image dans le repo)
 CANDIDATE_PATHS = [
     Path(__file__).parent / "assets" / "protocoles_tvnim.png",  # assets/protocoles_tvnim.png
-    Path(__file__).parent / "protocoles_tvnim.png",             # ./protocoles_tvnim.png (racine)
+    Path(__file__).parent / "protocoles_tvnim.png",             # ./protocoles_tvnim.png
 ]
 
 def show_protocol_image():
     """
-    Ordre de recherche :
-    A) PROTO_URL (si renseignée)  ➜ st.image(URL)
-    B) Fichier local (assets/… ou racine) ➜ st.image(path)
-    C) Uploader ➜ st.image(upload)
+    Ordre :
+    A) PROTO_URL si renseignée
+    B) Fichiers locaux (assets/… ou racine)
+    C) Uploader manuel
     """
     if PROTO_URL.strip():
         try:
@@ -124,28 +124,55 @@ def show_protocol_image():
 # =========================
 # LOGIQUE CLINIQUE — TVNIM (AFU)
 # =========================
-def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str:
+def stratifier_tvnim(
+    stade: str,
+    grade: str,
+    taille_mm: int,
+    nombre: str,
+    cis_associe: bool = False,
+    lvi: bool = False,
+    urethre_prostatique: bool = False,
+    formes_agressives: bool = False,
+) -> str:
     """
-    AFU (Tableau III) via nos champs :
+    AFU (Tableau III/IV) via nos champs :
     - Faible : pTa bas grade, <3 cm, unifocale
     - Intermédiaire : pTa bas grade (sans critères haut/très haut)
     - Haut : pT1 OU haut grade
-    - Très haut : pT1 haut grade + (taille >3 cm OU multifocale/papillomatose)
+    - Très haut : pT1 haut grade + (au moins un facteur aggravant)
+                  Facteurs aggravants : taille >3 cm, multifocalité/papillomatose,
+                                      CIS associé, LVI, atteinte urètre prostatique,
+                                      formes anatomo-pathologiques agressives
     """
-    if stade == "pTa" and grade == "Bas grade" and taille_mm < 30 and nombre == "Unique":
-        return "faible"
-    if stade == "pT1" and grade == "Haut grade" and (taille_mm > 30 or nombre != "Unique"):
+    # Très haut risque — si pT1 + Haut grade + (≥1 facteur aggravant)
+    facteurs_aggravants = (
+        (taille_mm > 30)
+        or (nombre != "Unique")
+        or cis_associe
+        or lvi
+        or urethre_prostatique
+        or formes_agressives
+    )
+    if stade == "pT1" and grade == "Haut grade" and facteurs_aggravants:
         return "très haut"
+
+    # Haut risque — si pT1 OU haut grade (sans facteurs => haut mais pas très haut)
     if stade == "pT1" or grade == "Haut grade":
         return "haut"
+
+    # Faible risque — pTa bas grade <3 cm unifocale
+    if stade == "pTa" and grade == "Bas grade" and taille_mm < 30 and nombre == "Unique":
+        return "faible"
+
+    # Intermédiaire — le reste des pTa bas grade
     return "intermédiaire"
 
 def plan_tvnim(risque: str):
     """
     Retourne (traitement, suivi, protocoles, notes_second_look)
-    Protocoles & doses usuelles (à adapter au contexte local / RCP).
+    Protocoles & doses usuelles (à adapter en RCP et selon disponibilité).
     """
-    # Notes RTUV second look — À rappeler quel que soit le risque (si critères présents)
+    # Notes RTUV second look — afficher quel que soit le risque si critères
     notes_second_look = [
         "RTUV de second look recommandée si :",
         "• Tumeur pT1 (réévaluation systématique).",
@@ -153,7 +180,6 @@ def plan_tvnim(risque: str):
         "• Absence de muscle détrusor dans la pièce initiale (qualité insuffisante).",
     ]
 
-    # Protocoles / Doses — textes prêts à afficher
     PROTO = {
         "IPOP": [
             "IPOP dans les 2 h (≤24 h) si pas d’hématurie/perforation :",
@@ -197,7 +223,7 @@ def plan_tvnim(risque: str):
             "Cytologie : non systématique.",
             "Uro-TDM : non systématique.",
         ]
-        protocoles = []  # pas d'entretien imposé
+        protocoles = []
     elif risque == "intermédiaire":
         traitement = [
             "RTUV complète (second look si doute d’exérèse).",
@@ -240,7 +266,8 @@ def plan_tvnim(risque: str):
 # =========================
 # EXPORTS (HTML / TXT)
 # =========================
-def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look) -> str:
+def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look,
+                      flags_txt: str = "") -> str:
     lines = []
     lines.append("Urology Assistant AI — CAT TVNIM (AFU 2024–2026)")
     lines.append(f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -250,6 +277,8 @@ def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, p
     lines.append(f"- Grade : {grade}")
     lines.append(f"- Taille max : {taille} mm")
     lines.append(f"- Nombre : {nombre}")
+    if flags_txt:
+        lines.append(flags_txt)
     lines.append("")
     lines.append(f"== Stratification du risque : {risque.upper()} ==")
     lines.append("")
@@ -310,10 +339,35 @@ def render_tvnim_page():
         grade = st.selectbox("Grade tumoral", ["Bas grade", "Haut grade"])
         taille = st.slider("Taille maximale (mm)", 1, 100, 10)
         nombre = st.selectbox("Nombre de tumeurs", ["Unique", "Multiple", "Papillomatose vésicale"])
+
+        # Champs additionnels visibles seulement si pT1 + Haut grade
+        cis_associe = False
+        lvi = False
+        urethre_prostatique = False
+        formes_agressives = False
+        if stade == "pT1" and grade == "Haut grade":
+            st.markdown("#### Facteurs aggravants (pT1 haut grade) — cochez s’ils sont présents")
+            c1, c2 = st.columns(2)
+            with c1:
+                cis_associe = st.checkbox("CIS associé")
+                lvi = st.checkbox("Envahissement lymphovasculaire (LVI)")
+            with c2:
+                urethre_prostatique = st.checkbox("Atteinte de l’urètre prostatique")
+                formes_agressives = st.checkbox("Formes anatomo-pathologiques agressives")
+
         submitted = st.form_submit_button("🔎 Générer la CAT")
 
     if submitted:
-        risque = stratifier_tvnim(stade, grade, taille, nombre)
+        risque = stratifier_tvnim(
+            stade=stade,
+            grade=grade,
+            taille_mm=taille,
+            nombre=nombre,
+            cis_associe=cis_associe,
+            lvi=lvi,
+            urethre_prostatique=urethre_prostatique,
+            formes_agressives=formes_agressives,
+        )
         traitement, suivi, protocoles, notes_second_look = plan_tvnim(risque)
 
         st.subheader(f"📊 Risque estimé : {risque.upper()}")
@@ -333,8 +387,20 @@ def render_tvnim_page():
         st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
         show_protocol_image()
 
-        # Export
-        report_text = build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look)
+        # Export avec rappel des flags si présents
+        flags_list = []
+        if stade == "pT1" and grade == "Haut grade":
+            if cis_associe: flags_list.append("• CIS associé : OUI")
+            if lvi: flags_list.append("• Envahissement lymphovasculaire (LVI) : OUI")
+            if urethre_prostatique: flags_list.append("• Atteinte de l’urètre prostatique : OUI")
+            if formes_agressives: flags_list.append("• Formes anatomo-pathologiques agressives : OUI")
+        flags_txt = ""
+        if flags_list:
+            flags_txt = "== Facteurs aggravants cochés ==\n" + "\n".join(flags_list)
+
+        report_text = build_report_text(
+            stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look, flags_txt
+        )
         st.markdown("### 📤 Export")
         offer_exports(report_text)
 
