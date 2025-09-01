@@ -1,11 +1,12 @@
-# app.py — version sans sidebar
+# app.py — Urology Assistant AI (sans sidebar) + module Vessie avec sous-pages
+# 1) TOUJOURS d'abord :
 import streamlit as st
 st.set_page_config(page_title="Urology Assistant AI", layout="wide")
 
 APP_TITLE = "Urology Assistant AI"
 APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 2024–2026"
 
-# Modules accessibles
+# Modules de niveau 1 (page d'accueil)
 MODULES = [
     "Tumeur de la vessie",
     "Tumeurs des voies excrétrices",
@@ -16,6 +17,7 @@ MODULES = [
     "Infectiologie",
 ]
 
+# Palette pastel
 PALETTE = {
     "Tumeur de la vessie": "#D8EEF0",
     "Tumeurs des voies excrétrices": "#E5F3E6",
@@ -26,121 +28,105 @@ PALETTE = {
     "Infectiologie": "#DDE8F7",
 }
 
-# Initialiser l’état de navigation
+# Init état de navigation
 if "page" not in st.session_state:
     st.session_state["page"] = "Accueil"
 
-# ---------- UI helpers ----------
+# ---------- helpers nav ----------
 def go_home():
     st.session_state["page"] = "Accueil"
-    st.experimental_rerun()
+    st.rerun()  # <- remplacement de st.experimental_rerun()
 
 def go_module(label: str):
     st.session_state["page"] = label
-    st.experimental_rerun()
+    st.rerun()  # <- remplacement de st.experimental_rerun()
 
+# ---------- UI helpers ----------
 def category_button(label: str, color: str, key: str):
     with st.container():
         clicked = st.button(f"{label}  ›", key=key, use_container_width=True)
         st.markdown(
-            f"<div style='height:6px;background:{color};border-radius:6px;margin-bottom:10px;'></div>",
+            f"<div style='height:6px;background:{color};border-radius:6px;margin-bottom:12px;'></div>",
             unsafe_allow_html=True,
         )
         if clicked:
             go_module(label)
 
-# ---------- Home page ----------
-def render_home():
-    st.markdown(f"<h1 style='color:#0E3C6E'>{APP_TITLE}</h1>", unsafe_allow_html=True)
-    st.markdown(f"<p style='color:#3a4a60'>{APP_SUBTITLE}</p>", unsafe_allow_html=True)
-    st.markdown("### Sélectionnez une rubrique")
+def top_header():
+    st.markdown(
+        f"<div style='padding:18px 22px;background:linear-gradient(90deg,#0E3C6E,#154c8a);"
+        f"border-radius:12px;margin-bottom:18px;'>"
+        f"<h1 style='color:#fff;margin:0;font-weight:800;font-size:28px'>{APP_TITLE}</h1>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
-    cols = st.columns(2)
+def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la vessie"):
+    cols = st.columns([1, 3])
+    with cols[0]:
+        st.button("🏠 Accueil", on_click=go_home)
+    if show_back:
+        with cols[1]:
+            st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
+
+# ---------- pages ----------
+def render_home():
+    top_header()
+    st.markdown("### Sélectionnez une rubrique")
+    st.caption(APP_SUBTITLE)
+
+    col1, col2 = st.columns(2)
     for i, mod in enumerate(MODULES):
-        with cols[i % 2]:
+        with (col1 if i % 2 == 0 else col2):
             category_button(mod, PALETTE[mod], key=f"btn_{i}")
 
-# ---------- Module page ----------
-def render_module(label: str):
-    st.button("🏠 Accueil", on_click=go_home)  # bouton retour
-    st.header(f"🔷 {label}")
-    st.info(f"Contenu du module **{label}** à implémenter…")
-
-# ---------- Routing ----------
-if st.session_state["page"] == "Accueil":
-    render_home()
-else:
-    render_module(st.session_state["page"])
-    # ============================================================
-# EXTENSION — Module "Tumeur de la vessie" avec sous-pages
-# À COLLER SOUS TON PREMIER CODE (append-only)
-# ============================================================
-
-# --- Helpers de navigation locaux (réutilise ton state "page") ---
-def _go(label: str):
-    st.session_state["page"] = label
-    st.experimental_rerun()
-
-def _btn_home_and_back(back_label: str = None):
-    c1, c2 = st.columns([1, 3])
-    with c1:
-        st.button("🏠 Accueil", on_click=lambda: _go("Accueil"))
-    if back_label:
-        with c2:
-            st.button("⬅️ Retour : Tumeur de la vessie", on_click=lambda: _go("Tumeur de la vessie"))
-
-# --- 2ᵉ page : menu interne du module vessie ---
 def render_vessie_menu():
+    btn_home_and_back()  # juste bouton Accueil
     st.markdown("## Tumeur de la vessie")
-    st.caption("Choisissez le sous-module à explorer")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.button("TVNIM", use_container_width=True, on_click=lambda: _go("Vessie: TVNIM"))
-    with col2:
-        st.button("TVIM", use_container_width=True, on_click=lambda: _go("Vessie: TVIM"))
-    with col3:
-        st.button("Tumeur de vessie métastatique", use_container_width=True, on_click=lambda: _go("Vessie: Métastatique"))
+    st.caption("Choisissez le sous-module")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.button("TVNIM", use_container_width=True, on_click=lambda: go_module("Vessie: TVNIM"))
+    with c2:
+        st.button("TVIM", use_container_width=True, on_click=lambda: go_module("Vessie: TVIM"))
+    with c3:
+        st.button("Tumeur de vessie métastatique", use_container_width=True, on_click=lambda: go_module("Vessie: Métastatique"))
 
-# --- Placeholders (tu brancheras tes formulaires/logiciels ici) ---
 def render_tvnim_page():
-    _btn_home_and_back(back_label="Tumeur de la vessie")
+    btn_home_and_back(show_back=True)
     st.header("🔷 TVNIM (tumeur vésicale n’infiltrant pas le muscle)")
-    st.info("Ici on branchera la stratification (faible/intermédiaire/haut/très haut), CAT détaillée (IPOP/chimio/BCG) et calendrier de surveillance AFU.")
+    st.info("Placeholder : ici on branchera la stratification AFU (faible/intermédiaire/haut/très haut), "
+            "la CAT détaillée (IPOP, chimio endovésicale, BCG) et les modalités de surveillance.")
 
 def render_tvim_page():
-    _btn_home_and_back(back_label="Tumeur de la vessie")
+    btn_home_and_back(show_back=True)
     st.header("🔷 TVIM (tumeur vésicale infiltrant le muscle)")
-    st.info("Ici on branchera néoadjuvant (cisplatine), cystectomie/TTM, adjuvant (nivolumab/chemo), et la surveillance AFU.")
+    st.info("Placeholder : ici on branchera néoadjuvant cisplatine, cystectomie/TTM, adjuvant (nivolumab/chemo) "
+            "et la surveillance AFU.")
 
 def render_vessie_meta_page():
-    _btn_home_and_back(back_label="Tumeur de la vessie")
+    btn_home_and_back(show_back=True)
     st.header("🔷 Tumeur de la vessie métastatique")
-    st.info("Ici on branchera Enfortumab+Pembrolizumab 1ʳᵉ ligne, alternatives (Cis/Gem+Nivo; Pt-based→Avelumab), et suivi d’imagerie.")
+    st.info("Placeholder : ici on branchera Enfortumab+Pembrolizumab (1re ligne), alternatives (Cis/Gem+Nivo; "
+            "Pt-based → Avelumab) et le suivi d’imagerie.")
 
-# --- Routing : on REMPLACE la version générique par une version avec sous-pages ---
-def render_module(label: str):
-    # module "Tumeur de la vessie" -> page intermédiaire avec 3 choix
-    if label == "Tumeur de la vessie":
-        _btn_home_and_back()  # juste le bouton Accueil en haut
-        render_vessie_menu()
-        return
-
-    # sous-pages
-    if label == "Vessie: TVNIM":
-        render_tvnim_page()
-        return
-    if label == "Vessie: TVIM":
-        render_tvim_page()
-        return
-    if label == "Vessie: Métastatique":
-        render_vessie_meta_page()
-        return
-
-    # fallback pour les autres modules (inchangé)
-    _btn_home_and_back()
+def render_generic_module(label: str):
+    btn_home_and_back()
     st.header(f"🔷 {label}")
     st.info(f"Contenu du module **{label}** à implémenter…")
 
-# --- forcer
+# ---------- routing ----------
+page = st.session_state["page"]
 
-
+if page == "Accueil":
+    render_home()
+elif page == "Tumeur de la vessie":
+    render_vessie_menu()
+elif page == "Vessie: TVNIM":
+    render_tvnim_page()
+elif page == "Vessie: TVIM":
+    render_tvim_page()
+elif page == "Vessie: Métastatique":
+    render_vessie_meta_page()
+else:
+    render_generic_module(page)
