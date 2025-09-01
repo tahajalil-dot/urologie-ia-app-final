@@ -1,4 +1,4 @@
-# app.py — Urology Assistant AI (Accueil + Vessie -> TVNIM/TVIM/Métastatique + HBP)
+# app.py — Urology Assistant AI (Accueil + Vessie -> TVNIM/TVIM/Métastatique + HBP refait)
 import streamlit as st
 import base64
 from datetime import datetime
@@ -115,7 +115,7 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
 def esc(x: str) -> str:
     return ihtml.escape(str(x))
 
-def render_kv_table(title: str, pairs: list[tuple[str, str]], col1: str = "Élément", col2: str = "Détail"):
+def render_kv_table(title, pairs, col1="Élément", col2="Détail"):
     if not pairs: return
     st.markdown(f"### {esc(title)}")
     html = [f"<div class='section-block'><table class='kv-table'><thead><tr><th>{esc(col1)}</th><th>{esc(col2)}</th></tr></thead><tbody>"]
@@ -137,7 +137,7 @@ def build_report_text(title: str, sections: dict) -> str:
             lines.append(f"• {x}")
         lines.append("")
     lines.append("Réfs : AFU/EAU — synthèse actualisée.")
-    return "\n".endjoin(lines) if False else "\n".join(lines)
+    return "\n".join(lines)
 
 def offer_exports(report_text: str, basename: str):
     html = f"""<!doctype html>
@@ -153,7 +153,7 @@ def offer_exports(report_text: str, basename: str):
 # =========================
 # IMAGE DES PROTOCOLES (facultatif)
 # =========================
-PROTO_URL = ""  # ← colle ici l’URL raw de ton schéma si tu veux l’afficher
+PROTO_URL = ""  # ← colle ici l’URL raw d’un schéma si tu veux l’afficher
 CANDIDATE_PATHS = [
     Path(__file__).parent / "assets" / "protocoles_tvnim.png",
     Path(__file__).parent / "protocoles_tvnim.png",
@@ -179,12 +179,6 @@ def show_protocol_image():
 # =========================
 def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str,
                      cis_associe=False, lvi=False, urethre_prostatique=False, formes_agressives=False) -> str:
-    """Simplifié AFU :
-    - Faible → pTa bas grade, <3 cm, unifocale
-    - Intermédiaire → pTa bas grade sinon
-    - Haut → pT1 OU haut grade
-    - Très haut → pT1 haut grade + ≥1 facteur aggravant (taille>3cm, multifocale/papillomatose, CIS, LVI, urètre prostatique, formes agressives)
-    """
     aggravants = (taille_mm > 30) or (nombre != "Unique") or cis_associe or lvi or urethre_prostatique or formes_agressives
     if stade == "pT1" and grade == "Haut grade" and aggravants:
         return "très haut"
@@ -195,15 +189,11 @@ def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str,
     return "intermédiaire"
 
 def plan_tvnim(risque: str):
-    """Retourne (traitement_list, suivi_list, protocoles_list, notes_second_look_list)
-    — BCG : PAS DE DOSE (supprimé), flèches “→”, scanner ajouté dans surveillance.
-    """
     notes_second_look = [
         "RTUV de second look → pT1 (réévaluation systématique).",
         "RTUV de second look → tumeur volumineuse et/ou multifocale (résection possiblement incomplète).",
         "RTUV de second look → muscle détrusor absent dans la pièce initiale.",
     ]
-
     PROTO = {
         "IPOP": [
             "Instillation postopératoire précoce (IPOP) → dans les 2 h si pas d’hématurie/perforation.",
@@ -286,14 +276,10 @@ def plan_tvnim(risque: str):
 def plan_tvim(t_cat: str, cN_pos: bool, metastases: bool, cis_eligible: bool,
               t2_localise: bool, hydron: bool, bonne_fct_v: bool, cis_diffus: bool,
               pdl1_pos: bool, post_op_high_risk: bool, neo_adjuvant_fait: bool):
-    """TVIM : flèches, TMT sans dose RT, suivi avec TDM TAP déjà inclus."""
     res = {"traitement": [], "surveillance": [], "notes": []}
-
     if metastases:
         res["traitement"].append("Maladie métastatique → utiliser le module « Vessie: Métastatique » (schémas 1re/2e ligne).")
         return res
-
-    # Néoadjuvant
     if cis_eligible:
         res["traitement"] += [
             "Chimiothérapie néoadjuvante (NAC) → avant cystectomie (si possible).",
@@ -302,32 +288,22 @@ def plan_tvim(t_cat: str, cN_pos: bool, metastases: bool, cis_eligible: bool,
         ]
     else:
         res["traitement"].append("Non éligible cisplatine → NAC non standard.")
-
-    # TMT (sans dose RT)
     if t2_localise and (not hydron) and bonne_fct_v and (not cis_diffus):
         res["traitement"] += [
             "Option préservation vésicale (TMT) → décision partagée.",
             "→ RTUV maximale + radiothérapie + radiosensibilisation (5-FU + mitomycine C, ou cisplatine hebdomadaire).",
             "→ Cystectomie de rattrapage si échec/progression.",
         ]
-        res["notes"] += [
-            "CI relatives TMT → hydronéphrose, CIS diffus, mauvaise capacité vésicale, tumeur non résécable.",
-        ]
-
-    # Cystectomie
+        res["notes"] += ["CI relatives TMT → hydronéphrose, CIS diffus, mauvaise capacité vésicale, tumeur non résécable."]
     res["traitement"] += [
         "Cystectomie radicale + curage ganglionnaire étendu (si pas de TMT).",
         "→ Dérivation : conduit iléal / néovessie orthotopique (urètre indemne, bonne fonction rénale/hépatique).",
     ]
-
-    # Adjuvant
     if post_op_high_risk or (not neo_adjuvant_fait):
         res["traitement"].append("Adjuvant à discuter →")
         if cis_eligible and (not neo_adjuvant_fait) and post_op_high_risk:
             res["traitement"].append("→ Chimiothérapie adjuvante (GC q21j ×4 ou dd-MVAC q14j ×4) si pT3–4/pN+.")
         res["traitement"].append("→ Immunothérapie adjuvante (ex : nivolumab) selon AMM/PD-L1, environ 1 an.")
-
-    # Suivi
     res["surveillance"] += [
         "Après cystectomie → clinique + biologie à 3–4 mois, puis /6 mois ×2 ans, puis annuel jusqu’à 5 ans.",
         "Après cystectomie → TDM TAP /6 mois ×2–3 ans, puis annuelle jusqu’à 5 ans.",
@@ -336,17 +312,12 @@ def plan_tvim(t_cat: str, cN_pos: bool, metastases: bool, cis_eligible: bool,
         "Après TMT → cystoscopie + cytologie /3 mois ×2 ans, puis /6 mois jusqu’à 5 ans, puis annuel.",
         "Après TMT → TDM TAP annuelle (ou /6–12 mois selon risque).",
     ]
-
-    res["notes"] += [
-        "Décision partagée en RCP (NAC vs TMT vs cystectomie).",
-    ]
+    res["notes"] += ["Décision partagée en RCP (NAC vs TMT vs cystectomie)."]
     return res
 
 def plan_meta(cis_eligible: bool, carbo_eligible: bool, platinum_naive: bool,
               pdl1_pos: bool, prior_platinum: bool, prior_cpi: bool, bone_mets: bool):
-    """Métastatique : flèches, suivi avec imagerie 8–12 sem."""
     res = {"traitement": [], "suivi": [], "notes": []}
-
     if platinum_naive:
         if cis_eligible:
             res["traitement"] += [
@@ -374,13 +345,11 @@ def plan_meta(cis_eligible: bool, carbo_eligible: bool, platinum_naive: bool,
             ]
         if (not prior_platinum):
             res["traitement"].append("Jamais exposé au platine → envisager GC ou Gem-Carbo selon éligibilité.")
-
     if bone_mets:
         res["traitement"] += [
             "Atteinte osseuse → protection osseuse : acide zolédronique IV ou dénosumab SC + Ca/VitD.",
         ]
         res["notes"].append("Prévenir l’ostéonécrose mandibulaire (bilan dentaire).")
-
     res["suivi"] += [
         "Clinique/biologie/toxicités → avant chaque cycle.",
         "Imagerie de réponse → toutes les 8–12 semaines au début, puis selon évolution.",
@@ -389,28 +358,67 @@ def plan_meta(cis_eligible: bool, carbo_eligible: bool, platinum_naive: bool,
     return res
 
 # =========================
-# LOGIQUE CLINIQUE — HBP
+# LOGIQUE CLINIQUE — HBP (refait)
 # =========================
 def classer_ipss(ipss: int) -> str:
     if ipss <= 7: return "légers"
     if ipss <= 19: return "modérés"
     return "sévères"
 
-def plan_hbp(age: int, volume_ml: int, lobe_median: bool, ipss: int, psa: float, 
+def eval_suspicion_adk(psa_total: float, psa_libre: float, volume_ml: int, tr_suspect: bool):
+    """Retourne (suspect_adk: bool, explications: list[str], psad: float, ratio: float|None)."""
+    exp = []
+    psad = None
+    ratio = None
+
+    # Toucher rectal
+    if tr_suspect:
+        exp.append("TR suspect → orientation cancer de la prostate.")
+        return True, exp, psad, ratio
+
+    # PSA total
+    if psa_total >= 10.0:
+        exp.append("PSA ≥ 10 ng/mL → orientation cancer de la prostate.")
+        return True, exp, psad, ratio
+
+    # PSA < 10 → calculer densité et f/t
+    if volume_ml > 0:
+        psad = psa_total / float(volume_ml)  # ng/mL / mL
+        exp.append(f"Densité PSA (PSAD) = {psad:.2f}.")
+    if psa_total > 0 and psa_libre is not None and psa_libre >= 0:
+        ratio = psa_libre / psa_total
+        exp.append(f"Rapport PSA libre/total (f/t) = {ratio:.2f}.")
+
+    # Cutoffs usuels
+    flags = []
+    if psad is not None and psad > 0.15:
+        flags.append("PSAD > 0,15")
+    if ratio is not None and ratio < 0.15:
+        flags.append("f/t < 0,15")
+
+    if flags:
+        exp.append("Critères suspects → " + " & ".join(flags) + ".")
+        return True, exp, psad, ratio
+
+    exp.append("PSAD et/ou f/t dans les normes → on poursuit l’analyse HBP.")
+    return False, exp, psad, ratio
+
+def plan_hbp(age: int, volume_ml: int, lobe_median: bool, ipss: int, psa_total: float,
              tr_suspect: bool, anticoag: bool, preservation_ejac: bool,
              ci_chirurgie: bool, refus_chir: bool, infections_recid: bool,
-             retention: bool, calculs: bool, hematurie_recid: bool, ir_post_obstacle: bool):
-    """Retourne dict {donnees_pairs, traitement_list, suivi_list, notes_list} avec flèches."""
+             retention: bool, calculs: bool, hematurie_recid: bool, ir_post_obstacle: bool,
+             psa_libre: float | None):
+    """Retourne dict {donnees_pairs, traitement_list, notes_list} sans 'suivi' (retiré)."""
     donnees = [
         ("Âge", f"{age} ans"),
         ("Volume prostatique", f"{volume_ml} mL"),
         ("Lobe médian", "Oui" if lobe_median else "Non"),
         ("IPSS", f"{ipss} ({classer_ipss(ipss)})"),
-        ("PSA", f"{psa:.2f} ng/mL"),
+        ("PSA total", f"{psa_total:.2f} ng/mL"),
         ("TR suspect", "Oui" if tr_suspect else "Non"),
         ("Anticoagulants/antiagrégants", "Oui" if anticoag else "Non"),
         ("Préservation éjaculation", "Oui" if preservation_ejac else "Non"),
-        ("CI ou refus chirurgie", "Oui" if (ci_chirurgie or refus_chir) else "Non"),
+        ("CI/refus chirurgie", "Oui" if (ci_chirurgie or refus_chir) else "Non"),
         ("Complications", ", ".join([txt for ok, txt in [
             (infections_recid, "IU récidivantes"),
             (retention, "Rétention urinaire"),
@@ -420,105 +428,101 @@ def plan_hbp(age: int, volume_ml: int, lobe_median: bool, ipss: int, psa: float,
         ] if ok]) or "Aucune"),
     ]
 
+    # 0) Triage cancer (ADK) d’abord
+    suspect_adk, exp_adk, psad, ratio = eval_suspicion_adk(psa_total, psa_libre, volume_ml, tr_suspect)
+    if psad is not None:
+        donnees.append(("Densité PSA (PSAD)", f"{psad:.2f}"))
+    if ratio is not None:
+        donnees.append(("PSA libre/total (f/t)", f"{ratio:.2f}"))
+
+    if suspect_adk:
+        traitement = [
+            "Orientation ADK prostatique →",
+            "→ IRM prostatique multiparamétrique.",
+            "→ Biopsies prostatiques ciblées ± systématiques (selon IRM/PIRADS).",
+            "→ Bilan complémentaire selon risque (ex : PSMA PET-CT si disponible).",
+            "→ Discussion en RCP uro-oncologie.",
+        ]
+        notes = exp_adk
+        return {"donnees": donnees, "traitement": traitement, "notes": notes}
+
+    # 1) HBP : règles et traitements (sans suivi)
     traitement = []
-    suivi = []
     notes = []
 
-    # 1) Red flags oncologiques
-    if tr_suspect or psa >= 4.0:
-        notes += ["PSA/TR suspects → bilan prostatique (IRM ± biopsies) avant décision définitive."]
-
-    # 2) Abstention & règles hygiéno-diététiques
-    if ipss <= 7 and not any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle]):
+    # Symptômes légers (et pas de complication)
+    if ipss <= 7 and not any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle, lobe_median]):
         traitement += [
             "Symptômes légers → abstention surveillée + règles hygiéno-diététiques.",
-            "→ Réduire caféine/alcool le soir, espacer les prises hydriques, mictions régulières.",
-        ]
-        suivi += [
-            "Contrôle clinique/IPSS → à 6–12 mois.",
+            "→ Réduire caféine/alcool le soir, mictions régulières, gestion hydrique.",
         ]
 
-    # 3) Traitement médical (modérés/sévères sans complication majeure)
+    # Traitement médical (modérés/sévères ou gène importante)
     if ipss >= 8 and not any([retention, ir_post_obstacle]):
         traitement += [
             "Traitement médical →",
-            "→ Alpha-bloquant (ex : tamsulosine/silodosine) si symptômes mixtes.",
+            "→ Alpha-bloquant (ex : tamsulosine/silodosine) si LUTS modérés/sévères (effet rapide).",
         ]
-        if volume_ml >= 40 or psa >= 1.5:
-            if preservation_ejac:
-                notes += ["Préservation éjaculation prioritaire → informer sur risque troubles éjaculatoires avec 5-ARI."]
-            traitement += ["→ ± Inhibiteur 5-alpha-réductase (finastéride/dutastéride) si volume ≥ 40 mL ou PSA ≥ 1,5."]
+        # 5-ARI selon volume/PSA
+        if volume_ml >= 40 or psa_total >= 1.5:
+            traitement += [
+                "→ ± Inhibiteur 5-α-réductase (finastéride/dutastéride) si prostate ≥ 40 mL ou PSA ≥ 1,5 (réduction volume/risque RA à long terme).",
+                "→ ± Association alpha-bloquant + 5-ARI si symptômes importants ET gros volume.",
+            ]
+        # Options selon profil
         traitement += [
-            "→ ± Tadalafil 5 mg/j si LUTS avec dysfonction érectile.",
-            "→ ± Antimuscarinique ou β3-agoniste si symptômes de stockage et pas de rétention.",
+            "→ ± Tadalafil 5 mg/j si LUTS associés à dysfonction érectile.",
+            "→ ± Antimuscarinique ou β3-agoniste si symptômes de stockage (si RPM non élevé).",
         ]
-        suivi += [
-            "Réévaluation → 6–12 semaines (IPSS/QoL), puis /6–12 mois.",
-        ]
+        if preservation_ejac:
+            notes += ["Préservation éjaculation → attention aux troubles éjaculatoires possibles avec certains alpha-bloquants."]
 
-    # 4) Indication chirurgicale (complications ou échec médical)
-    if any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle]) or (ipss >= 8 and (ci_chirurgie is False and refus_chir is False and True)):
-        # Choix technique
+    # Indications chirurgicales fortes
+    indications_chir = any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle, lobe_median])
+    if indications_chir or (ipss >= 8 and not ci_chirurgie and not refus_chir):
         if ci_chirurgie or refus_chir:
-            # Alternatives non chirurgicales
             if volume_ml > 80:
-                traitement += [
-                    "CI/refus de chirurgie avec gros volume → embolisation artères prostatiques (discussion RCP).",
-                ]
+                traitement += ["CI/refus de chirurgie avec gros volume → embolisation artères prostatiques (discussion RCP)."]
             else:
-                traitement += [
-                    "CI/refus de chirurgie → options conservatrices (optimisation médicale, cathéterisation intermittente).",
-                ]
+                traitement += ["CI/refus de chirurgie → optimisation médicale, sondages intermittents si besoin."]
         else:
-            # Techniques chirurgicales / endo-urologiques
-            if volume_ml < 30 and not lobe_median:
-                traitement += [
-                    "Volume < 30 mL sans lobe médian → incision cervico-prostatique (TUIP).",
-                    "→ Avantages : temps court, saignement limité, meilleure préservation éjaculation.",
-                    "→ Inconvénients : risque de retraitement plus élevé que RTUP.",
-                ]
-            elif 30 <= volume_ml <= 80:
-                if anticoag:
+            # Choix technique selon volume + lobe médian (ta consigne : lobe médian = indication chirurgicale)
+            if volume_ml < 30:
+                # Normalement TUIP si pas de lobe médian; mais ici lobe médian → éviter TUIP, préférer RTUP/énucléation
+                if lobe_median:
                     traitement += [
-                        "30–80 mL avec risque hémorragique/anticoagulants → PVP GreenLight.",
-                        "→ Hémostase excellente, souvent ambulatoire.",
+                        "Petit volume avec lobe médian → privilégier RTUP bipolaire ou énucléation endoscopique (éviter TUIP).",
                     ]
+                else:
+                    traitement += [
+                        "Volume < 30 mL (sans lobe médian) → TUIP (incision cervico-prostatique).",
+                        "→ Avantages : geste court, peu de saignement, meilleure préservation éjaculatoire.",
+                        "→ Inconvénients : risque de retraitement supérieur à RTUP.",
+                    ]
+            elif 30 <= volume_ml <= 80:
+                bloc = []
+                bloc.append("30–80 mL → RTUP mono/bipolaire (référence).")
+                if anticoag:
+                    bloc.append("→ Risque hémorragique/anticoagulants → PVP GreenLight (excellente hémostase).")
+                bloc.append("→ Alternatives selon plateau/expérience : énucléation endoscopique (HoLEP/ThuLEP/BipolEP).")
+                traitement += bloc
+            else:  # >80 mL
                 traitement += [
-                    "30–80 mL → RTUP (mono/bipolaire) en référence.",
-                ]
-                traitement += [
-                    "Alternative plateau/expérience → énucléation endoscopique (HoLEP/BipolEP/GreenLEP).",
-                ]
-            else:  # > 80 mL
-                traitement += [
-                    "> 80–100 mL → énucléation endoscopique à privilégier si disponible.",
-                    "→ Si non disponible → adénomectomie voie haute (AVH).",
+                    "> 80–100 mL → énucléation endoscopique (HoLEP/ThuLEP) à privilégier si disponible.",
+                    "→ Si non disponible → adénomectomie voie haute (ouverte/robot assistée).",
                 ]
 
-            # Préservation éjaculation
+            # Préservation éjaculation (fenêtre)
             if (volume_ml < 70) and (not lobe_median) and preservation_ejac:
-                traitement += [
-                    "Objectif préservation éjaculation (< 70 mL, sans lobe médian) → implants urétraux (UroLift).",
-                ]
+                traitement += ["Objectif préservation éjaculation (< 70 mL, sans lobe médian) → implants urétraux (UroLift)."]
 
-    # Suivi généraux
-    suivi += [
-        "Après traitement médical → contrôle IPSS/QoL, EA, PSA si indiqué, /6–12 mois.",
-        "Après chirurgie endoscopique → ablation sonde selon protocole local, contrôle IPSS/QoL à 3 mois, puis annuel.",
-    ]
-
-    # Notes générales
+    # Notes additionnelles
     if anticoag:
-        notes += ["Anticoagulants/antiagrégants → privilégier technique à faible risque hémorragique (GreenLight/HoLEP)."]
+        notes += ["Anticoagulants/antiagrégants → préférer GreenLight/HoLEP (hémostase supérieure)."]
     if lobe_median and volume_ml < 30:
-        notes += ["Lobe médian présent avec petit volume → TUIP moins favorable (discuter RTUP/énucléation)."]
+        notes += ["Lobe médian présent avec petit volume → RTUP/énucléation préférables à TUIP."]
 
-    return {
-        "donnees": donnees,
-        "traitement": traitement,
-        "suivi": suivi,
-        "notes": notes,
-    }
+    return {"donnees": donnees, "traitement": traitement, "notes": notes}
 
 # =========================
 # PAGES
@@ -544,13 +548,11 @@ def render_vessie_menu():
 def render_tvnim_page():
     btn_home_and_back(show_back=True)
     st.header("🔷 TVNIM (tumeur n’infiltrant pas le muscle)")
-
     with st.form("tvnim_form"):
         stade = st.selectbox("Stade tumoral", ["pTa", "pT1"])
         grade = st.selectbox("Grade tumoral", ["Bas grade", "Haut grade"])
         taille = st.slider("Taille maximale (mm)", 1, 100, 10)
         nombre = st.selectbox("Nombre de tumeurs", ["Unique", "Multiple", "Papillomatose vésicale"])
-        # Facteurs aggravants (pT1 haut grade)
         cis_associe = lvi = urethre_prostatique = formes_agressives = False
         if stade == "pT1" and grade == "Haut grade":
             st.markdown("#### Facteurs aggravants (pT1 haut grade) — cochez s’ils sont présents")
@@ -562,39 +564,27 @@ def render_tvnim_page():
                 urethre_prostatique = st.checkbox("Atteinte de l’urètre prostatique")
                 formes_agressives = st.checkbox("Formes anatomo-pathologiques agressives")
         submitted = st.form_submit_button("🔎 Générer la CAT")
-
     if submitted:
-        risque = stratifier_tvnim(stade, grade, taille, nombre,
-                                  cis_associe, lvi, urethre_prostatique, formes_agressives)
+        risque = stratifier_tvnim(stade, grade, taille, nombre, cis_associe, lvi, urethre_prostatique, formes_agressives)
         traitement, suivi, protocoles, notes_second_look = plan_tvnim(risque)
-
-        donnees_pairs = [
-            ("Stade", stade), ("Grade", grade), ("Taille maximale", f"{taille} mm"), ("Nombre", nombre),
-        ]
+        donnees_pairs = [("Stade", stade), ("Grade", grade), ("Taille maximale", f"{taille} mm"), ("Nombre", nombre)]
         if stade == "pT1" and grade == "Haut grade":
             if cis_associe: donnees_pairs.append(("CIS associé", "Oui"))
             if lvi: donnees_pairs.append(("LVI", "Oui"))
             if urethre_prostatique: donnees_pairs.append(("Atteinte urètre prostatique", "Oui"))
             if formes_agressives: donnees_pairs.append(("Formes anatomo-path. agressives", "Oui"))
-
         render_kv_table("🧾 Données saisies", donnees_pairs)
         render_kv_table("📊 Stratification", [("Risque estimé", risque.upper())], "Élément", "Résultat")
-
         st.markdown("### 💊 Traitement recommandé")
         for t in traitement: st.markdown("- " + t)
         if protocoles:
             st.markdown("### 📦 Schémas BCG (sans dose)")
             for p in protocoles: st.markdown("- " + p)
-
         st.markdown("### 📅 Modalités de suivi")
         for s in suivi: st.markdown("- " + s)
-
         st.markdown("### 📝 RTUV de second look — rappels")
         for n in notes_second_look: st.markdown("- " + n)
-
-        # (Optionnel) visuel
-        # show_protocol_image()
-
+        # show_protocol_image()  # optionnel
         sections = {
             "Données": [f"{k}: {v}" for k, v in donnees_pairs],
             "Stratification": [f"Risque estimé : {risque.upper()}"],
@@ -603,13 +593,11 @@ def render_tvnim_page():
             "Rappels second look": notes_second_look,
         }
         report_text = build_report_text("CAT TVNIM", sections)
-        st.markdown("### 📤 Export")
-        offer_exports(report_text, "CAT_TVNIM")
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVNIM")
 
 def render_tvim_page():
     btn_home_and_back(show_back=True)
     st.header("🔷 TVIM (tumeur infiltrant le muscle)")
-
     with st.form("tvim_form"):
         t_cat = st.selectbox("T (clinique)", ["T2", "T3", "T4a"])
         cN_pos = st.radio("Atteinte ganglionnaire clinique (cN+) ?", ["Non", "Oui"], horizontal=True) == "Oui"
@@ -624,49 +612,26 @@ def render_tvim_page():
         post_op_high_risk = st.radio("pT3–4 et/ou pN+ attendu/identifié ?", ["Non", "Oui"], horizontal=True) == "Oui"
         neo_adjuvant_fait = st.radio("Néoadjuvant déjà réalisé ?", ["Non", "Oui"], horizontal=True) == "Oui"
         submitted = st.form_submit_button("🔎 Générer la CAT – TVIM")
-
     if submitted:
-        plan = plan_tvim(t_cat, cN_pos, metastases, cis_eligible, t2_localise, hydron,
-                         bonne_fct_v, cis_diffus, pdl1_pos, post_op_high_risk, neo_adjuvant_fait)
-
+        plan = plan_tvim(t_cat, cN_pos, metastases, cis_eligible, t2_localise, hydron, bonne_fct_v, cis_diffus, pdl1_pos, post_op_high_risk, neo_adjuvant_fait)
         donnees_pairs = [
-            ("T", t_cat), ("cN+", "Oui" if cN_pos else "Non"),
-            ("Métastases", "Oui" if metastases else "Non"),
-            ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
-            ("T2 localisée (TMT possible)", "Oui" if t2_localise else "Non"),
-            ("Hydronéphrose", "Oui" if hydron else "Non"),
-            ("Bonne fonction vésicale", "Oui" if bonne_fct_v else "Non"),
-            ("CIS diffus", "Oui" if cis_diffus else "Non"),
-            ("PD-L1 positif", "Oui" if pdl1_pos else "Non"),
-            ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"),
-            ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
+            ("T", t_cat), ("cN+", "Oui" if cN_pos else "Non"), ("Métastases", "Oui" if metastases else "Non"),
+            ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"), ("T2 localisée (TMT possible)", "Oui" if t2_localise else "Non"),
+            ("Hydronéphrose", "Oui" if hydron else "Non"), ("Bonne fonction vésicale", "Oui" if bonne_fct_v else "Non"),
+            ("CIS diffus", "Oui" if cis_diffus else "Non"), ("PD-L1 positif", "Oui" if pdl1_pos else "Non"),
+            ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"), ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
         ]
         render_kv_table("🧾 Données saisies", donnees_pairs)
-
-        st.markdown("### 💊 Traitement recommandé")
-        for x in plan["traitement"]: st.markdown("- " + x)
-
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["surveillance"]: st.markdown("- " + x)
-
+        st.markdown("### 💊 Traitement recommandé");  [st.markdown("- " + x) for x in plan["traitement"]]
+        st.markdown("### 📅 Modalités de suivi");      [st.markdown("- " + x) for x in plan["surveillance"]]
         if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]: st.markdown("- " + x)
-
-        sections = {
-            "Données": [f"{k}: {v}" for k, v in donnees_pairs],
-            "Traitement recommandé": plan["traitement"],
-            "Modalités de suivi": plan["surveillance"],
-            "Notes": plan["notes"],
-        }
-        report_text = build_report_text("CAT TVIM", sections)
-        st.markdown("### 📤 Export")
-        offer_exports(report_text, "CAT_TVIM")
+            st.markdown("### 📝 Notes");              [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in donnees_pairs],"Traitement recommandé":plan["traitement"],"Modalités de suivi":plan["surveillance"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT TVIM", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVIM")
 
 def render_vessie_meta_page():
     btn_home_and_back(show_back=True)
     st.header("🔷 Tumeur de la vessie métastatique")
-
     with st.form("meta_form"):
         st.markdown("#### Contexte & éligibilité")
         platinum_naive = st.radio("Jamais traité par platine (1re ligne) ?", ["Oui", "Non"], horizontal=True) == "Oui"
@@ -677,10 +642,8 @@ def render_vessie_meta_page():
         prior_cpi = st.radio("A déjà reçu une immunothérapie (CPI) ?", ["Non", "Oui"], horizontal=True) == "Oui"
         bone_mets = st.radio("Métastases osseuses ?", ["Non", "Oui"], horizontal=True) == "Oui"
         submitted = st.form_submit_button("🔎 Générer la CAT – Métastatique")
-
     if submitted:
         plan = plan_meta(cis_eligible, carbo_eligible, platinum_naive, pdl1_pos, prior_platinum, prior_cpi, bone_mets)
-
         donnees_pairs = [
             ("1re ligne (naïf platine)", "Oui" if platinum_naive else "Non"),
             ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
@@ -691,41 +654,28 @@ def render_vessie_meta_page():
             ("Métastases osseuses", "Oui" if bone_mets else "Non"),
         ]
         render_kv_table("🧾 Données saisies", donnees_pairs)
-
-        st.markdown("### 💊 Traitement recommandé")
-        for x in plan["traitement"]: st.markdown("- " + x)
-
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
-
+        st.markdown("### 💊 Traitement recommandé"); [st.markdown("- " + x) for x in plan["traitement"]]
+        st.markdown("### 📅 Modalités de suivi");     [st.markdown("- " + x) for x in plan["suivi"]]
         if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]: st.markdown("- " + x)
-
-        sections = {
-            "Données": [f"{k}: {v}" for k, v in donnees_pairs],
-            "Traitement recommandé": plan["traitement"],
-            "Modalités de suivi": plan["suivi"],
-            "Notes": plan["notes"],
-        }
-        report_text = build_report_text("CAT Vessie Métastatique", sections)
-        st.markdown("### 📤 Export")
-        offer_exports(report_text, "CAT_Vessie_Metastatique")
+            st.markdown("### 📝 Notes");             [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in donnees_pairs],"Traitement recommandé":plan["traitement"],"Modalités de suivi":plan["suivi"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT Vessie Métastatique", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Vessie_Metastatique")
 
 # -------------------------
-# HBP
+# HBP (UI)
 # -------------------------
 def render_hbp_page():
     btn_home_and_back()
     st.header("🔷 Hypertrophie bénigne de la prostate (HBP)")
+
     with st.form("hbp_form"):
         age = st.number_input("Âge", min_value=40, max_value=100, value=65)
         volume = st.number_input("Volume prostatique (mL)", min_value=10, max_value=250, value=45)
         lobe_median = st.radio("Lobe médian présent ?", ["Non", "Oui"], horizontal=True) == "Oui"
         ipss = st.slider("Score IPSS", 0, 35, 18)
-        psa = st.number_input("PSA total (ng/mL)", min_value=0.0, step=0.1, value=1.6)
+        psa_total = st.number_input("PSA total (ng/mL)", min_value=0.0, step=0.1, value=1.6)
         tr_suspect = st.radio("Toucher rectal suspect ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        anticoag = st.radio("Anticoagulants/antiagrégants en cours ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        anticoag = st.radio("Anticoagulants/antiagrégants ?", ["Non", "Oui"], horizontal=True) == "Oui"
         preservation_ejac = st.radio("Souhaite préserver l’éjaculation ?", ["Non", "Oui"], horizontal=True) == "Oui"
         ci_chirurgie = st.radio("Contre-indication à la chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
         refus_chir = st.radio("Refus de chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
@@ -738,29 +688,34 @@ def render_hbp_page():
         with c4: hematurie_recid = st.checkbox("Hématurie récidivante")
         with c5: ir_post_obstacle = st.checkbox("Altération fonction rénale")
 
+        # Si PSA < 10 : demander PSA libre pour calcul f/t
+        psa_libre = None
+        if psa_total < 10.0:
+            psa_libre = st.number_input("PSA libre (ng/mL) — requis si PSA < 10", min_value=0.0, step=0.05, value=0.3)
+
         submitted = st.form_submit_button("🔎 Générer la CAT – HBP")
 
     if submitted:
-        plan = plan_hbp(age, volume, lobe_median, ipss, psa, tr_suspect, anticoag,
-                        preservation_ejac, ci_chirurgie, refus_chir, infections_recid,
-                        retention, calculs, hematurie_recid, ir_post_obstacle)
+        plan = plan_hbp(
+            age, volume, lobe_median, ipss, psa_total, tr_suspect, anticoag, preservation_ejac,
+            ci_chirurgie, refus_chir, infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle,
+            psa_libre
+        )
 
         render_kv_table("🧾 Données saisies", plan["donnees"])
 
         st.markdown("### 💊 Conduite à tenir / Options thérapeutiques")
-        for x in plan["traitement"]: st.markdown("- " + x)
-
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
 
         if plan["notes"]:
             st.markdown("### 📝 Notes")
-            for x in plan["notes"]: st.markdown("- " + x)
+            for x in plan["notes"]:
+                st.markdown("- " + x)
 
         sections = {
             "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
-            "Traitement": plan["traitement"],
-            "Suivi": plan["suivi"],
+            "Conduite à tenir / Options thérapeutiques": plan["traitement"],
             "Notes": plan["notes"],
         }
         report_text = build_report_text("CAT HBP", sections)
