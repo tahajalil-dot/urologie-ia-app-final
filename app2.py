@@ -197,31 +197,30 @@ if menu == "Cancer de la vessie (TVNIM / TVIM)":
     st.header("🔷 Cancer de la vessie – TVNIM / TVIM")
 
     with st.form("vessie_form"):
-        st.subheader("📌 Données anatomopathologiques")
+        st.subheader("📌 Données anatomopathologiques (de base)")
         stade = st.selectbox("Stade tumoral", ["pTa", "pT1", "pT2 ou plus"])  # pT2+=TVIM
         grade = st.selectbox("Grade tumoral", ["Bas grade", "Haut grade"])
         cis = st.radio("Présence de CIS ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        nombre = st.selectbox("Nombre de tumeurs", ["Unique", "Multiple"])
-        taille = st.slider("Taille de la plus grande lésion (mm)", 1, 100, 15)
-        recidive = st.radio("Récidive ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        lvi = st.radio("Envahissement lymphovasculaire ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        urethral = st.radio("Atteinte urètre prostatique ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        number_basic = st.selectbox("Nombre de tumeurs", ["Unique", "Multiple"])
+        size_basic = st.slider("Taille de la plus grande lésion (mm)", 1, 100, 15)
 
-        st.subheader("🧪 Contexte clinique")
-        ipop_ok = st.radio("IPOP réalisable (pas d'hématurie/perforation) ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        metastases = st.radio("Métastases à distance ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        # Afficher les blocs avancés UNIQUEMENT si pT2+ OU (pT1 avec indication potentielle à la cystectomie)
+        pt1_cysto_suspect = (stade == "pT1" and grade == "Haut grade" and (number_basic == "Multiple" or size_basic >= 30 or cis))
+        show_advanced = (stade == "pT2 ou plus") or pt1_cysto_suspect
 
-        st.subheader("⚙️ Options thérapeutiques / éligibilités")
-        cis_eligible = st.radio("Éligible cisplatine (PS 0–1, DFG ≥50–60) ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        t2_localise = st.radio("Tumeur T2 localisée (unique, mobile) ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        cis_diffus = st.radio("CIS diffus ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        hydro = st.radio("Hydronéphrose ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        bonne_fct = st.radio("Bonne fonction vésicale ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        pdl1_pos = st.radio("PD-L1 positif (si disponible) ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        post_op_high_risk = st.radio("pT3–4 et/ou pN+ après chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        neo_adjuvant_fait = st.radio("Chimiothérapie néoadjuvante déjà réalisée ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        if show_advanced:
+            st.subheader("🔎 Facteurs avancés (affichés car indication potentielle de cystectomie)")
+            recidive = st.radio("Récidive ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            lvi = st.radio("Envahissement lymphovasculaire ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            urethral = st.radio("Atteinte urètre prostatique ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        else:
+            # Valeurs par défaut non aggravantes si non affichées
+            recidive = False
+            lvi = False
+            urethral = False
 
-        submitted = st.form_submit_button("🔎 Générer la CAT – Vessie")
+        # Contexte clinique TVNIM seulement (IPOP) – reste masqué pour TVIM ou pT1 cystectomie
+        if stade in ["pTa", "pT1"] and not show_advanced:
 
     if submitted:
         reco_lines: List[str] = []
