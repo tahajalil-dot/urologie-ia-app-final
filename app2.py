@@ -76,6 +76,24 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
         with cols[1]:
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
 
+
+# =========================
+# IMAGE DES PROTOCOLES (BCG / MMC) — IMAGE EMBARQUÉE
+# =========================
+# Ton image "Capture d’écran 2025-09-01 à 12.19.54.png" encodée ici en base64
+# (pas besoin d'assets ni d'upload)
+EMBEDDED_PROTO_IMG_B64 = """
+iVBORw0KGgoAAAANSUhEUgAA...TRONQUE_POUR_LISIBILITÉ...AAAASUVORK5CYII=
+""".strip()
+
+def show_protocol_image():
+    try:
+        img_bytes = base64.b64decode(EMBEDDED_PROTO_IMG_B64)
+        st.image(img_bytes, use_container_width=True,
+                 caption="Schéma des protocoles (BCG / MMC)")
+    except Exception:
+        st.warning("Impossible d’afficher l’image embarquée.")
+
 # =========================
 # LOGIQUE CLINIQUE — TVNIM (AFU)
 # =========================
@@ -152,7 +170,7 @@ def plan_tvnim(risque: str):
             "Cytologie : non systématique.",
             "Uro-TDM : non systématique.",
         ]
-        protocoles = []  # on n’impose pas BCG/MMC d’entretien
+        protocoles = []  # pas d'entretien imposé
     elif risque == "intermédiaire":
         traitement = [
             "RTUV complète (second look si doute d’exérèse).",
@@ -191,6 +209,7 @@ def plan_tvnim(risque: str):
         protocoles = []
 
     return traitement, suivi, protocoles, notes_second_look
+
 
 # =========================
 # EXPORTS (HTML / TXT)
@@ -235,28 +254,6 @@ def offer_exports(report_text: str):
     st.markdown(f'<a href="data:text/html;base64,{b64_html}" download="CAT_TVNIM.html">📄 Télécharger en HTML</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="CAT_TVNIM.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
 
-# =========================
-# IMAGE DES PROTOCOLES (BCG / MMC)
-# =========================
-DEFAULT_PROTO_IMG = Path(__file__).parent / "assets" / "protocoles_tvnim.png"
-
-def show_protocol_image():
-    """
-    1) Si 'assets/protocoles_tvnim.png' existe -> affiche.
-    2) Sinon -> propose un uploader pour téléverser l’image (png/jpg).
-    3) Si rien -> warning.
-    """
-    if DEFAULT_PROTO_IMG.exists():
-        st.image(str(DEFAULT_PROTO_IMG), use_container_width=True,
-                 caption="Schéma des protocoles (depuis assets/protocoles_tvnim.png)")
-        return
-
-    uploaded = st.file_uploader("📎 Importer l'image des protocoles (png/jpg)", type=["png", "jpg", "jpeg"])
-    if uploaded is not None:
-        st.image(uploaded, use_container_width=True, caption="Schéma des protocoles (image téléversée)")
-    else:
-        st.warning("Image des protocoles introuvable. Ajoute le fichier **assets/protocoles_tvnim.png** au repo "
-                   "ou téléverse une image via le sélecteur ci-dessus.")
 
 # =========================
 # PAGES
