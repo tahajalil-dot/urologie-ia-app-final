@@ -5,9 +5,25 @@ from datetime import datetime
 from pathlib import Path
 
 # =========================
-# CONFIG DE BASE
+# CONFIG DE BASE + THEME CLAIR
 # =========================
 st.set_page_config(page_title="Urology Assistant AI", layout="wide")
+
+# Force un look "mode jour" (clair) via CSS injecté
+st.markdown("""
+<style>
+:root, .stApp, .block-container { background-color: #ffffff !important; color: #111 !important; }
+[data-testid="stHeader"], header { background-color: #ffffff !important; }
+section.main > div { background-color: #ffffff !important; }
+h1,h2,h3,h4,h5,h6 { color:#0E3C6E; }
+.stButton > button { background: #0E3C6E; color: #fff; border-radius: 10px; padding: 0.6rem 1rem; border: none; }
+.stButton > button:hover { background: #154c8a; }
+div[data-baseweb="select"] > div { background: #fff !important; color:#111 !important; }
+.st-emotion-cache-1y4p8pa { color:#111 !important; } /* captions */
+table { background:#fff !important; }
+thead tr th { background:#F2F6FA !important; color:#0E3C6E !important; }
+</style>
+""", unsafe_allow_html=True)
 
 APP_TITLE = "Urology Assistant AI"
 APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 2024–2026"
@@ -15,7 +31,7 @@ APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 202
 # Modules (page d’accueil)
 MODULES = [
     "Tumeur de la vessie",
-    "Tumeurs des voies excrétrices",
+    "Tumeurs des voies excrétries",
     "Tumeur de la prostate",
     "Tumeur du rein",
     "Hypertrophie bénigne de la prostate (HBP)",
@@ -23,15 +39,15 @@ MODULES = [
     "Infectiologie",
 ]
 
-# Couleurs pastel pour la grille d’accueil
+# Couleurs pastel pour la grille d’accueil (barres décoratives)
 PALETTE = {
-    "Tumeur de la vessie": "#D8EEF0",
-    "Tumeurs des voies excrétrices": "#E5F3E6",
-    "Tumeur de la prostate": "#FFF2C6",
-    "Tumeur du rein": "#FFD8CC",
-    "Hypertrophie bénigne de la prostate (HBP)": "#E7E0FF",
-    "Lithiase": "#FFE6CC",
-    "Infectiologie": "#DDE8F7",
+    "Tumeur de la vessie": "#CDEAF1",
+    "Tumeurs des voies excrétries": "#E7F4EA",
+    "Tumeur de la prostate": "#FFF1C7",
+    "Tumeur du rein": "#FFDAD1",
+    "Hypertrophie bénigne de la prostate (HBP)": "#E8E2FF",
+    "Lithiase": "#FFE9D2",
+    "Infectiologie": "#E3ECFF",
 }
 
 # Etat initial de navigation
@@ -61,10 +77,12 @@ def category_button(label: str, color: str, key: str):
 
 def top_header():
     st.markdown(
-        f"<div style='padding:18px 22px;background:linear-gradient(90deg,#0E3C6E,#154c8a);"
-        f"border-radius:12px;margin-bottom:18px;'>"
-        f"<h1 style='color:#fff;margin:0;font-weight:800;font-size:28px'>{APP_TITLE}</h1>"
-        f"</div>",
+        f"""
+        <div style='padding:18px 22px;background:linear-gradient(90deg,#F7FBFF,#E8F1FA);
+        border:1px solid #dfe8f2;border-radius:12px;margin-bottom:18px;'>
+        <h1 style='color:#0E3C6E;margin:0;font-weight:800;font-size:28px'>{APP_TITLE}</h1>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
@@ -75,6 +93,42 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
     if show_back:
         with cols[1]:
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
+
+# ------ Tableau helper (sans pandas) ------
+def render_table(title: str, items: list[str], col_name: str = "Recommandation"):
+    """Affiche un bloc-titre + un tableau à une colonne contenant items."""
+    if not items:
+        return
+    st.markdown(f"### {title}")
+    rows = [{col_name: it} for it in items]
+    st.table(rows)
+
+# ------ Export helpers ------
+def build_report_text(title: str, sections: dict) -> str:
+    lines = []
+    lines.append(f"Urology Assistant AI — {title} (AFU 2024–2026)")
+    lines.append(f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    lines.append("")
+    for sec, arr in sections.items():
+        if not arr:
+            continue
+        lines.append(f"== {sec} ==")
+        for x in arr:
+            lines.append(f"• {x}")
+        lines.append("")
+    lines.append("Réfs : AFU/EAU — synthèse actualisée.")
+    return "\n".join(lines)
+
+def offer_exports(report_text: str, basename: str):
+    html = f"""<!doctype html>
+<html lang="fr"><meta charset="utf-8">
+<title>{basename}</title>
+<pre>{report_text}</pre>
+</html>"""
+    b64_html = base64.b64encode(html.encode()).decode()
+    b64_txt = base64.b64encode(report_text.encode()).decode()
+    st.markdown(f'<a href="data:text/html;base64,{b64_html}" download="{basename}.html">📄 Télécharger en HTML</a>', unsafe_allow_html=True)
+    st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="{basename}.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
 
 # =========================
 # IMAGE DES PROTOCOLES (BCG / MMC) — URL / LOCAL / UPLOAD
@@ -97,6 +151,7 @@ def show_protocol_image():
     B) Fichiers locaux (assets/… ou racine)
     C) Uploader manuel
     """
+    st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
     if PROTO_URL.strip():
         try:
             st.image(PROTO_URL.strip(), use_container_width=True, caption="Schéma des protocoles (chargé via URL)")
@@ -278,57 +333,68 @@ def plan_tvim(
     """
     res = {"traitement": [], "surveillance": [], "notes": []}
 
-    # Cas métastatique -> renvoyer vers module spécifique
     if metastases:
         res["traitement"].append("⚠️ Maladie métastatique : basculer vers le module « Vessie: Métastatique » pour schémas de 1re/2e ligne.")
         return res
 
-    # Néoadjuvant (si éligible cisplatine)
+    # Néoadjuvant
     if cis_eligible:
-        res["traitement"].append("🧪 **Chimiothérapie néoadjuvante (NAC) recommandée** avant cystectomie (si possible) :")
-        res["traitement"].append("• Gemcitabine + Cisplatine (GC), q21j × 4 cycles :")
-        res["traitement"].append("  - Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.")
-        res["traitement"].append("• OU dd-MVAC (q14j × 4) avec G-CSF :")
-        res["traitement"].append("  - Méthotrexate 30 mg/m² J1, Vinblastine 3 mg/m² J2, Doxorubicine 30 mg/m² J2, Cisplatine 70 mg/m² J2.")
-        res["traitement"].append("  - Support G-CSF (J3–J10) selon protocole local.")
+        res["traitement"].extend([
+            "🧪 **Chimiothérapie néoadjuvante (NAC) recommandée** avant cystectomie (si possible) :",
+            "• Gemcitabine + Cisplatine (GC), q21j × 4 cycles :",
+            "  - Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.",
+            "• OU dd-MVAC (q14j × 4) avec G-CSF :",
+            "  - Méthotrexate 30 mg/m² J1, Vinblastine 3 mg/m² J2, Doxorubicine 30 mg/m² J2, Cisplatine 70 mg/m² J2.",
+            "  - Support G-CSF (J3–J10) selon protocole local.",
+        ])
     else:
         res["traitement"].append("⛔ Non éligible cisplatine : pas de NAC standard.")
-        # Option TMT si bien sélectionné
-    # Choix local: cystectomie vs préservation vésicale (TMT)
+
+    # Option TMT
     if t2_localise and (not hydron) and bonne_fct_v and (not cis_diffus):
-        res["traitement"].append("🟦 **Option conservatrice (Trimodal Therapy - TMT)** possible si patient informé :")
-        res["traitement"].append("• RTUV maximale (résection complète) + radiochimiothérapie concomitante.")
-        res["traitement"].append("• Radiothérapie vésicale 64–66 Gy (ex : 55 Gy/20 fractions ou 64 Gy/32 fractions selon centre).")
-        res["traitement"].append("• Radiosensibilisation :")
-        res["traitement"].append("  - 5-FU 500 mg/m² J1–5 et J16–20 + Mitomycine C 12 mg/m² J1,")
-        res["traitement"].append("    OU Cisplatine hebdo 30–40 mg/m² selon éligibilité.")
-        res["notes"].append("❗ Contre-indications relatives à TMT : hydronéphrose, CIS diffus, mauvaise capacité vésicale, tumeur non résécable.")
+        res["traitement"].extend([
+            "🟦 **Option conservatrice (Trimodal Therapy - TMT)** possible si patient informé :",
+            "• RTUV maximale (résection complète) + radiochimiothérapie concomitante.",
+            "• Radiothérapie vésicale 64–66 Gy (ex : 55 Gy/20 fractions ou 64 Gy/32 fractions selon centre).",
+            "• Radiosensibilisation :",
+            "  - 5-FU 500 mg/m² J1–5 et J16–20 + Mitomycine C 12 mg/m² J1,",
+            "    OU Cisplatine hebdo 30–40 mg/m² selon éligibilité.",
+        ])
+        res["notes"].append("❗ CI relatives TMT : hydronéphrose, CIS diffus, mauvaise capacité vésicale, tumeur non résécable.")
         res["notes"].append("🔁 Cystectomie de rattrapage si échec/progression ou récidive MIBC.")
-    # Cystectomie radicale
-    res["traitement"].append("🔴 **Cystectomie radicale avec curage ganglionnaire étendu** (si pas de TMT) :")
-    res["traitement"].append("• Dérivation urinaire : conduit iléal / néovessie orthotopique (si urètre indemne et bonne fonction rénale/hépatique).")
-    # Adjuvant (si NAC non faite ou haut risque postop)
+
+    # Cystectomie
+    res["traitement"].extend([
+        "🔴 **Cystectomie radicale avec curage ganglionnaire étendu** (si pas de TMT) :",
+        "• Dérivation : conduit iléal / néovessie orthotopique (si urètre indemne & bonne fonction rénale/hépatique).",
+    ])
+
+    # Adjuvant
     if post_op_high_risk or (not neo_adjuvant_fait):
         res["traitement"].append("🟠 **Adjuvant à discuter** :")
         if cis_eligible and (not neo_adjuvant_fait) and post_op_high_risk:
             res["traitement"].append("• Chimiothérapie adjuvante (GC q21j × 4 ou dd-MVAC q14j × 4) si pT3–4 et/ou pN+.")
         res["traitement"].append("• Immunothérapie adjuvante (ex : Nivolumab 240 mg q2s ou 480 mg q4s, 1 an) si pT3–4/pN+ (selon AMM/PD-L1).")
 
-    # Surveillance après cystectomie
-    res["surveillance"].append("📅 **Suivi après cystectomie** :")
-    res["surveillance"].append("• Clinique + bilan bio à 3–4 mois, puis tous les 6 mois × 2 ans, puis annuel jusqu’à 5 ans.")
-    res["surveillance"].append("• Imagerie TDM TAP : /6 mois × 2–3 ans, puis annuelle jusqu’à 5 ans.")
-    res["surveillance"].append("• Surveillance urétrale si marges urétrales/CIS trigonal (cytologie urétrale ± urétroscopie).")
-    res["surveillance"].append("• Dérivation : fonction rénale/électrolytes, B12 annuelle si néovessie iléale; soins de stomie si conduit iléal.")
+    # Suivi cystectomie
+    res["surveillance"].extend([
+        "📅 **Suivi après cystectomie** :",
+        "• Clinique + bio à 3–4 mois, puis /6 mois × 2 ans, puis annuel jusqu’à 5 ans.",
+        "• TDM TAP : /6 mois × 2–3 ans, puis annuelle jusqu’à 5 ans.",
+        "• Surveillance urétrale si marges urétrales/CIS trigonal (cytologie urétrale ± urétroscopie).",
+        "• Dérivation : fonction rénale/électrolytes, B12 annuelle si néovessie; soins de stomie si conduit.",
+    ])
 
-    # Surveillance après TMT
-    res["surveillance"].append("📅 **Suivi après stratégie conservatrice (TMT)** :")
-    res["surveillance"].append("• Cystoscopie + cytologie : tous les 3 mois × 2 ans, puis /6 mois jusqu’à 5 ans, puis annuel.")
-    res["surveillance"].append("• TDM TAP : annuelle (ou /6–12 mois selon risque).")
-    res["surveillance"].append("• Cystectomie de rattrapage si récidive MIBC/non-répondeur.")
+    # Suivi TMT
+    res["surveillance"].extend([
+        "📅 **Suivi après TMT** :",
+        "• Cystoscopie + cytologie : /3 mois × 2 ans, puis /6 mois jusqu’à 5 ans, puis annuel.",
+        "• TDM TAP : annuelle (ou /6–12 mois selon risque).",
+        "• Cystectomie de rattrapage si récidive MIBC/non-répondeur.",
+    ])
 
-    res["notes"].append("⚖️ Les choix (NAC vs TMT vs cystectomie directe) relèvent d’une décision partagée en RCP.")
-    res["notes"].append("🔬 Adapter les doses aux protocoles pharmacie/oncologie du centre (clairance, comorbidités).")
+    res["notes"].append("⚖️ Décision partagée en RCP (NAC vs TMT vs cystectomie directe).")
+    res["notes"].append("🔬 Doses indicatives, à valider par oncologie/pharmacie (clairance, comorbidités).")
     return res
 
 # =========================
@@ -345,27 +411,32 @@ def plan_meta(
 ):
     """
     Retourne dict: { 'traitement': [...], 'suivi': [...], 'notes': [...] }
-    1re ligne : cis-eligible -> GC ou dd-MVAC +/- avelumab maintenance; cis-ineligible -> Gem-Carbo (si éligible) +/- avelumab
-    Après platine : CPI (pembrolizumab) ; après platine + CPI : enfortumab vedotin / sacituzumab (selon disponibilité).
+    1re ligne : cis-eligible -> GC / dd-MVAC ± avelumab maintenance;
+                cis-ineligible -> Gem-Carbo (si éligible) ± avelumab
+    Après platine : CPI (pembrolizumab) ; après platine + CPI : enfortumab / sacituzumab (selon disponibilité).
     """
     res = {"traitement": [], "suivi": [], "notes": []}
 
     if platinum_naive:
         res["traitement"].append("🧪 **1re ligne** :")
         if cis_eligible:
-            res["traitement"].append("• Gemcitabine + Cisplatine (GC), q21j × 4–6 cycles :")
-            res["traitement"].append("  - Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.")
-            res["traitement"].append("• OU dd-MVAC (q14j × 4–6) avec G-CSF.")
-            res["traitement"].append("• **Maintenance par Avelumab** 800 mg IV q2s jusqu’à progression/toxicité si réponse ou SD après platine.")
+            res["traitement"].extend([
+                "• Gemcitabine + Cisplatine (GC), q21j × 4–6 cycles :",
+                "  - Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.",
+                "• OU dd-MVAC (q14j × 4–6) avec G-CSF.",
+                "• **Maintenance par Avelumab** 800 mg IV q2s jusqu’à progression/toxicité si réponse/SD après platine.",
+            ])
         elif carbo_eligible:
-            res["traitement"].append("• Gemcitabine + Carboplatine (AUC 4–5) q21j × 4–6 cycles (cisplatine inéligible).")
-            res["traitement"].append("• **Maintenance par Avelumab** 800 mg IV q2s si réponse/SD après platine.")
+            res["traitement"].extend([
+                "• Gemcitabine + Carboplatine (AUC 4–5) q21j × 4–6 cycles (cisplatine inéligible).",
+                "• **Maintenance par Avelumab** 800 mg IV q2s si réponse/SD après platine.",
+            ])
         else:
             res["traitement"].append("• Patient inéligible au platine :")
             if pdl1_pos:
-                res["traitement"].append("  - Immunothérapie seule (ex : Pembrolizumab 200 mg q3s ou 400 mg q6s) si PD-L1 positif selon AMM locale.")
+                res["traitement"].append("  - Immunothérapie seule (ex : Pembrolizumab 200 mg q3s ou 400 mg q6s) si PD-L1 positif.")
             else:
-                res["traitement"].append("  - Immunothérapie seule à discuter en RCP (contexte d’AMM/PD-L1/local).")
+                res["traitement"].append("  - Immunothérapie seule à discuter en RCP (selon AMM/PD-L1/local).")
     else:
         res["traitement"].append("🧪 **Lignes ultérieures** :")
         if prior_platinum and (not prior_cpi):
@@ -377,47 +448,22 @@ def plan_meta(
             res["traitement"].append("• En cas d’absence de platine antérieur et si éligible : revenir à GC ou Gem-Carbo selon éligibilité.")
 
     if bone_mets:
-        res["traitement"].append("🦴 **Os-protecteurs** :")
-        res["traitement"].append("• Acide zolédronique 4 mg IV q4s (adapter à la fonction rénale) OU Dénosumab 120 mg SC q4s + Ca/VitD.")
+        res["traitement"].extend([
+            "🦴 **Os-protecteurs** :",
+            "• Acide zolédronique 4 mg IV q4s (adapter à la fonction rénale) OU Dénosumab 120 mg SC q4s + Ca/VitD.",
+        ])
         res["notes"].append("• Prévenir l’ostéonécrose de la mâchoire (bilan dentaire pré-thérapeutique).")
 
-    res["suivi"].append("📅 **Suivi métastatique** :")
-    res["suivi"].append("• Évaluation clinico-bio + toxicités avant chaque cycle.")
-    res["suivi"].append("• Imagerie de réponse toutes les 8–12 semaines au début, puis selon évolution.")
-    res["suivi"].append("• Soins de support (douleur, nutrition, thrombo-prophylaxie selon risque).")
+    res["suivi"].extend([
+        "📅 **Suivi métastatique** :",
+        "• Évaluation clinico-bio + toxicités avant chaque cycle.",
+        "• Imagerie de réponse toutes les 8–12 semaines au début, puis selon évolution.",
+        "• Soins de support (douleur, nutrition, thrombo-prophylaxie selon risque).",
+    ])
 
     res["notes"].append("⚠️ Adapter à l’AMM locale/stock/essais cliniques. Décisions en RCP.")
     res["notes"].append("🔬 Doses indicatives, à valider avec l’oncologie médicale/pharmacie.")
     return res
-
-# =========================
-# EXPORTS (HTML / TXT)
-# =========================
-def build_report_text(title: str, sections: dict) -> str:
-    lines = []
-    lines.append(f"Urology Assistant AI — {title} (AFU 2024–2026)")
-    lines.append(f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    lines.append("")
-    for sec, arr in sections.items():
-        if not arr:
-            continue
-        lines.append(f"== {sec} ==")
-        for x in arr:
-            lines.append(f"• {x}")
-        lines.append("")
-    lines.append("Réfs : AFU/EAU — NAC cisplatine, cystectomie/curage; TMT sélectionnée; maintenance avelumab; adjuvant nivolumab pT3–4/pN+.")
-    return "\n".join(lines)
-
-def offer_exports(report_text: str, basename: str):
-    html = f"""<!doctype html>
-<html lang="fr"><meta charset="utf-8">
-<title>{basename}</title>
-<pre>{report_text}</pre>
-</html>"""
-    b64_html = base64.b64encode(html.encode()).decode()
-    b64_txt = base64.b64encode(report_text.encode()).decode()
-    st.markdown(f'<a href="data:text/html;base64,{b64_html}" download="{basename}.html">📄 Télécharger en HTML</a>', unsafe_allow_html=True)
-    st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="{basename}.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
 
 # =========================
 # PAGES
@@ -480,31 +526,34 @@ def render_tvnim_page():
         )
         traitement, suivi, protocoles, notes_second_look = plan_tvnim(risque)
 
-        st.subheader(f"📊 Risque estimé : {risque.upper()}")
-        st.markdown("### 💊 Traitement")
-        for t in traitement: st.markdown("- " + t)
-        if protocoles:
-            st.markdown("### 📦 Protocoles détaillés")
-            for p in protocoles: st.markdown("- " + p)
-        st.markdown("### 📅 Suivi")
-        for s in suivi: st.markdown("- " + s)
-        st.markdown("### 📝 RTUV de second look — rappels (quel que soit le risque)")
-        for n in notes_second_look: st.markdown("- " + n)
+        # Tables
+        donnees = [
+            f"Stade : {stade}",
+            f"Grade : {grade}",
+            f"Taille max : {taille} mm",
+            f"Nombre : {nombre}",
+        ]
+        if stade == "pT1" and grade == "Haut grade":
+            flags = []
+            if cis_associe: flags.append("CIS associé : OUI")
+            if lvi: flags.append("LVI : OUI")
+            if urethre_prostatique: flags.append("Atteinte urètre prostatique : OUI")
+            if formes_agressives: flags.append("Formes anatomo-path. agressives : OUI")
+            donnees += flags
 
-        st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
+        render_table("📊 Stratification", [f"Risque estimé : {risque.upper()}"], col_name="Résultat")
+        render_table("🧾 Données saisies", donnees, col_name="Détail")
+        render_table("💊 Traitement recommandé", traitement)
+        if protocoles:
+            render_table("📦 Protocoles détaillés", protocoles)
+        render_table("📅 Modalités de suivi", suivi)
+        render_table("📝 RTUV de second look — rappels", notes_second_look)
+
         show_protocol_image()
 
+        # Export
         sections = {
-            "Données": [
-                f"Stade: {stade}", f"Grade: {grade}", f"Taille max: {taille} mm", f"Nombre: {nombre}"
-            ] + (
-                ["Facteurs aggravants cochés :"] +
-                (["- CIS associé"] if cis_associe else []) +
-                (["- LVI"] if lvi else []) +
-                (["- Urètre prostatique"] if urethre_prostatique else []) +
-                (["- Formes anatomo-path. agressives"] if formes_agressives else [])
-                if (stade == "pT1" and grade == "Haut grade") else []
-            ),
+            "Données": donnees,
             "Stratification": [f"Risque estimé : {risque.upper()}"],
             "Traitement recommandé": traitement + (["Détails de protocoles :"] + protocoles if protocoles else []),
             "Modalités de suivi": suivi,
@@ -542,27 +591,29 @@ def render_tvim_page():
             neo_adjuvant_fait=neo_adjuvant_fait
         )
 
-        st.subheader("🧠 Recommandation IA — TVIM")
-        st.markdown("### 💊 Traitement")
-        for x in plan["traitement"]: st.markdown("- " + x)
-        st.markdown("### 📅 Surveillance")
-        for x in plan["surveillance"]: st.markdown("- " + x)
+        # Tables
+        donnees = [
+            f"T : {t_cat}",
+            f"cN+ : {'Oui' if cN_pos else 'Non'}",
+            f"Métastases : {'Oui' if metastases else 'Non'}",
+            f"Éligible Cisplatine : {'Oui' if cis_eligible else 'Non'}",
+            f"T2 localisée (TMT possible) : {'Oui' if t2_localise else 'Non'}",
+            f"Hydronéphrose : {'Oui' if hydron else 'Non'}",
+            f"Bonne fonction vésicale : {'Oui' if bonne_fct_v else 'Non'}",
+            f"CIS diffus : {'Oui' if cis_diffus else 'Non'}",
+            f"PD-L1 positif : {'Oui' if pdl1_pos else 'Non'}",
+            f"pT3–4/pN+ attendu ou retrouvé : {'Oui' if post_op_high_risk else 'Non'}",
+            f"NAC déjà faite : {'Oui' if neo_adjuvant_fait else 'Non'}",
+        ]
+        render_table("🧾 Données saisies", donnees, col_name="Détail")
+        render_table("💊 Traitement recommandé", plan["traitement"])
+        render_table("📅 Modalités de suivi", plan["surveillance"])
         if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]: st.markdown("- " + x)
+            render_table("📝 Notes", plan["notes"])
 
+        # Export
         sections = {
-            "Données": [
-                f"T: {t_cat}", f"cN+: {'Oui' if cN_pos else 'Non'}", f"Métastases: {'Oui' if metastases else 'Non'}",
-                f"Éligible Cisplatine: {'Oui' if cis_eligible else 'Non'}",
-                f"T2 localisée (TMT possible): {'Oui' if t2_localise else 'Non'}",
-                f"Hydronéphrose: {'Oui' if hydron else 'Non'}",
-                f"Bonne fonction vésicale: {'Oui' if bonne_fct_v else 'Non'}",
-                f"CIS diffus: {'Oui' if cis_diffus else 'Non'}",
-                f"PD-L1 positif: {'Oui' if pdl1_pos else 'Non'}",
-                f"pT3–4/pN+ attendu ou retrouvé: {'Oui' if post_op_high_risk else 'Non'}",
-                f"NAC déjà faite: {'Oui' if neo_adjuvant_fait else 'Non'}",
-            ],
+            "Données": donnees,
             "Traitement recommandé": plan["traitement"],
             "Modalités de suivi": plan["surveillance"],
             "Notes": plan["notes"],
@@ -592,25 +643,25 @@ def render_vessie_meta_page():
             pdl1_pos=pdl1_pos, prior_platinum=prior_platinum, prior_cpi=prior_cpi, bone_mets=bone_mets
         )
 
-        st.subheader("🧠 Recommandation IA — Métastatique")
-        st.markdown("### 💊 Traitement")
-        for x in plan["traitement"]: st.markdown("- " + x)
-        st.markdown("### 📅 Suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        # Tables
+        donnees = [
+            f"1re ligne (naïf platine) : {'Oui' if platinum_naive else 'Non'}",
+            f"Éligible Cisplatine : {'Oui' if cis_eligible else 'Non'}",
+            f"Éligible Carboplatine : {'Oui' if carbo_eligible else 'Non'}",
+            f"PD-L1 positif : {'Oui' if pdl1_pos else 'Non'}",
+            f"Platines reçus : {'Oui' if prior_platinum else 'Non'}",
+            f"CPI reçu : {'Oui' if prior_cpi else 'Non'}",
+            f"Métastases osseuses : {'Oui' if bone_mets else 'Non'}",
+        ]
+        render_table("🧾 Données saisies", donnees, col_name="Détail")
+        render_table("💊 Traitement recommandé", plan["traitement"])
+        render_table("📅 Modalités de suivi", plan["suivi"])
         if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]: st.markdown("- " + x)
+            render_table("📝 Notes", plan["notes"])
 
+        # Export
         sections = {
-            "Données": [
-                f"1re ligne (naïf platine): {'Oui' if platinum_naive else 'Non'}",
-                f"Éligible Cisplatine: {'Oui' if cis_eligible else 'Non'}",
-                f"Éligible Carboplatine: {'Oui' if carbo_eligible else 'Non'}",
-                f"PD-L1 positif: {'Oui' if pdl1_pos else 'Non'}",
-                f"Platines reçus: {'Oui' if prior_platinum else 'Non'}",
-                f"CPI reçu: {'Oui' if prior_cpi else 'Non'}",
-                f"Métastases osseuses: {'Oui' if bone_mets else 'Non'}",
-            ],
+            "Données": donnees,
             "Traitement recommandé": plan["traitement"],
             "Modalités de suivi": plan["suivi"],
             "Notes": plan["notes"],
