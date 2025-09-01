@@ -2,15 +2,15 @@
 import streamlit as st
 import base64
 from datetime import datetime
+from pathlib import Path
 
-# --- CONFIG ---
+# =========================
+# CONFIG DE BASE
+# =========================
 st.set_page_config(page_title="Urology Assistant AI", layout="wide")
 
 APP_TITLE = "Urology Assistant AI"
 APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 2024–2026"
-
-# Image des protocoles (ton schéma BCG/MMC)
-PROTO_IMG_PATH = "/mnt/data/Capture d’écran 2025-09-01 à 12.19.54.png"  # <- change le chemin si nécessaire
 
 # Modules (page d’accueil)
 MODULES = [
@@ -23,7 +23,7 @@ MODULES = [
     "Infectiologie",
 ]
 
-# Couleurs pastel
+# Couleurs pastel pour la grille d’accueil
 PALETTE = {
     "Tumeur de la vessie": "#D8EEF0",
     "Tumeurs des voies excrétrices": "#E5F3E6",
@@ -34,11 +34,13 @@ PALETTE = {
     "Infectiologie": "#DDE8F7",
 }
 
-# Etat initial
+# Etat initial de navigation
 if "page" not in st.session_state:
     st.session_state["page"] = "Accueil"
 
-# --- Helpers navigation ---
+# =========================
+# HELPERS UI & NAVIGATION
+# =========================
 def go_home():
     st.session_state["page"] = "Accueil"
     st.rerun()
@@ -75,11 +77,11 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
 
 # =========================
-# TVNIM — logique clinique (AFU)
+# LOGIQUE CLINIQUE — TVNIM (AFU)
 # =========================
 def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str:
     """
-    AFU (Tableau III) simplifiée avec nos variables :
+    AFU (Tableau III) via nos champs :
     - Faible : pTa bas grade, <3 cm, unifocale
     - Intermédiaire : pTa bas grade (sans critères haut/très haut)
     - Haut : pT1 OU haut grade
@@ -95,70 +97,70 @@ def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str
 
 def plan_tvnim(risque: str):
     """
-    Retourne (traitement, suivi, protocoles détaillés, notes_second_look)
-    Doses et schémas usuels (alignés pratique clinique/AFU) — à adapter selon disponibilités locales.
+    Retourne (traitement, suivi, protocoles, notes_second_look)
+    Protocoles & doses usuelles (à adapter au contexte local / RCP).
     """
-    # Notes RTUV second look — à afficher pour TOUS les cas si critères
+    # Notes RTUV second look — A AFFICHER POUR TOUS les cas si un critère est présent
     notes_second_look = [
-        "RTUV de second look :",
-        "- Indiquée pour TOUTE tumeur pT1 (réévaluation systématique).",
-        "- Indiquée si tumeur volumineuse et/ou multifocale (1re résection potentiellement incomplète).",
-        "- Indiquée si absence de muscle détrusor dans la pièce initiale.",
+        "RTUV de second look recommandée si :",
+        "• Tumeur pT1 (réévaluation systématique).",
+        "• Tumeur volumineuse et/ou multifocale (première résection possiblement incomplète).",
+        "• Absence de muscle détrusor dans la pièce initiale (qualité insuffisante).",
     ]
 
-    # Protocoles / Doses
+    # Protocoles / Doses — textes prêts à afficher
     PROTO = {
         "IPOP": [
-            "IPOP dans les 2 heures (au plus tard 24 h) si pas d’hématurie/perforation :",
-            "• Mitomycine C 40 mg dans 40 mL (instillation unique, rétention 1–2 h),",
-            "  OU Épirubicine 50 mg (40–50 mL),",
+            "IPOP dans les 2 h (≤24 h) si pas d’hématurie/perforation :",
+            "• Mitomycine C 40 mg dans 40 mL (instillation unique, rétention 1–2 h).",
+            "  OU Épirubicine 50 mg (40–50 mL).",
             "  OU Gemcitabine 1 g (50 mL).",
         ],
         "CHIMIO_EV": [
-            "Chimiothérapie endovésicale (schéma d’induction 6–8 hebdo) :",
-            "• Mitomycine C 40 mg / 40 mL, 1×/semaine ×6 à 8 semaines.",
-            "• Épirubicine 50 mg / 40–50 mL, 1×/semaine ×6 à 8 semaines.",
-            "• Gemcitabine 1 g / 50 mL, 1×/semaine ×6 à 8 semaines.",
-            "Entretien (optionnel selon risque intermédiaire) : 1 instillation mensuelle ×9 (mois 4→12).",
+            "Chimiothérapie endovésicale — Induction 6–8 hebdomadaires :",
+            "• Mitomycine C 40 mg / 40 mL, 1×/semaine ×6–8.",
+            "• Épirubicine 50 mg / 40–50 mL, 1×/semaine ×6–8.",
+            "• Gemcitabine 1 g / 50 mL, 1×/semaine ×6–8.",
+            "Entretien optionnel (intermédiaire) : 1 instillation mensuelle ×9 (mois 4→12).",
         ],
         "BCG_12M": [
-            "BCG (risque intermédiaire, entretien 12 mois) :",
+            "BCG — maintien 12 mois (risque intermédiaire) :",
             "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
-            "• Entretien 12 mois : 3 instillations aux mois 3, 6, 12 (3×3).",
+            "• Entretien 12 mois : 3 instillations aux mois 3, 6 et 12 (3×3).",
             "Dose : flacon standard (dose complète), rétention ~2 h si toléré.",
         ],
         "BCG_36M": [
-            "BCG (haut / très haut risque, entretien 36 mois) :",
+            "BCG — maintien 36 mois (haut / très haut) :",
             "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
-            "• Entretien 36 mois : 3 instillations à M3, M6, M12, puis tous les 6 mois jusqu’à M36 (schéma 3/6/12 puis /6 mois).",
+            "• Entretien : 3 instillations à M3, M6, M12, puis tous les 6 mois jusqu’à M36.",
             "Dose : flacon standard (dose complète), rétention ~2 h si toléré.",
         ],
         "RCP_CYSTECTOMIE": [
-            "En cas de très haut risque :",
-            "• Discussion de cystectomie précoce avec curage ganglionnaire étendu en RCP.",
+            "Très haut risque :",
+            "• Discussion RCP pour cystectomie précoce avec curage ganglionnaire étendu.",
         ],
     }
 
     if risque == "faible":
         traitement = [
-            "RTUV complète et profonde (détrusor présent au compte rendu opératoire).",
+            "RTUV complète et profonde (mention du détrusor au CR opératoire).",
             *PROTO["IPOP"],
-            "Aucun traitement complémentaire d’entretien n’est requis.",
+            "Aucun traitement complémentaire d’entretien requis.",
         ]
         suivi = [
             "Cystoscopie : 3e et 12e mois, puis 1×/an pendant 5 ans.",
             "Cytologie : non systématique.",
             "Uro-TDM : non systématique.",
         ]
-        protocoles = []
+        protocoles = []  # on n’impose pas BCG/MMC d’entretien
     elif risque == "intermédiaire":
         traitement = [
-            "RTUV complète (second look si doute de résection).",
+            "RTUV complète (second look si doute d’exérèse).",
             *PROTO["CHIMIO_EV"],
-            "Alternative possible : BCG (induction 6) + entretien 12 mois (si récidives attendues).",
+            "Alternative possible : BCG (induction 6) + entretien 12 mois selon profil.",
         ]
         suivi = [
-            "Cystoscopie : 3e et 6e mois, puis /6 mois pendant 2 ans, puis 1×/an (au moins 10 ans).",
+            "Cystoscopie : 3e et 6e mois, puis tous les 6 mois pendant 2 ans, puis 1×/an (≥10 ans).",
             "Cytologie : systématique.",
             "Uro-TDM : non systématique.",
         ]
@@ -167,10 +169,10 @@ def plan_tvnim(risque: str):
         traitement = [
             "RTUV complète + second look si pT1 ou muscle absent.",
             *PROTO["BCG_36M"],
-            "Si CI/échec BCG : chimiothérapie endovésicale (MMC/gemcitabine ± docétaxel) selon tolérance.",
+            "Si CI/échec BCG : chimio endovésicale (MMC/gemcitabine ± docétaxel) selon tolérance.",
         ]
         suivi = [
-            "Cystoscopie : /3 mois pendant 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
+            "Cystoscopie : tous les 3 mois pendant 2 ans, puis tous les 6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
             "Uro-TDM : annuel recommandé.",
         ]
@@ -182,7 +184,7 @@ def plan_tvnim(risque: str):
             *PROTO["RCP_CYSTECTOMIE"],
         ]
         suivi = [
-            "Cystoscopie : /3 mois pendant 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
+            "Cystoscopie : tous les 3 mois pendant 2 ans, puis tous les 6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
             "Uro-TDM : annuel obligatoire.",
         ]
@@ -190,6 +192,9 @@ def plan_tvnim(risque: str):
 
     return traitement, suivi, protocoles, notes_second_look
 
+# =========================
+# EXPORTS (HTML / TXT)
+# =========================
 def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look) -> str:
     lines = []
     lines.append("Urology Assistant AI — CAT TVNIM (AFU 2024–2026)")
@@ -207,13 +212,13 @@ def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, p
     for t in traitement: lines.append(f"• {t}")
     if protocoles:
         lines.append("")
-        lines.append("== Détails de protocoles (si retenus) ==")
+        lines.append("== Détails de protocoles ==")
         for p in protocoles: lines.append(f"• {p}")
     lines.append("")
     lines.append("== Modalités de suivi ==")
     for s in suivi: lines.append(f"• {s}")
     lines.append("")
-    lines.append("== RTUV de second look : rappels (à considérer quel que soit le risque) ==")
+    lines.append("== RTUV de second look : rappels ==")
     for n in notes_second_look: lines.append(f"• {n}")
     lines.append("")
     lines.append("Réfs : AFU 2024–2026 — Tableau III (stratification/traitement), Tableau IV (suivi), reco RTUV de qualité.")
@@ -231,7 +236,30 @@ def offer_exports(report_text: str):
     st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="CAT_TVNIM.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
 
 # =========================
-# Pages
+# IMAGE DES PROTOCOLES (BCG / MMC)
+# =========================
+DEFAULT_PROTO_IMG = Path(__file__).parent / "assets" / "protocoles_tvnim.png"
+
+def show_protocol_image():
+    """
+    1) Si 'assets/protocoles_tvnim.png' existe -> affiche.
+    2) Sinon -> propose un uploader pour téléverser l’image (png/jpg).
+    3) Si rien -> warning.
+    """
+    if DEFAULT_PROTO_IMG.exists():
+        st.image(str(DEFAULT_PROTO_IMG), use_container_width=True,
+                 caption="Schéma des protocoles (depuis assets/protocoles_tvnim.png)")
+        return
+
+    uploaded = st.file_uploader("📎 Importer l'image des protocoles (png/jpg)", type=["png", "jpg", "jpeg"])
+    if uploaded is not None:
+        st.image(uploaded, use_container_width=True, caption="Schéma des protocoles (image téléversée)")
+    else:
+        st.warning("Image des protocoles introuvable. Ajoute le fichier **assets/protocoles_tvnim.png** au repo "
+                   "ou téléverse une image via le sélecteur ci-dessus.")
+
+# =========================
+# PAGES
 # =========================
 def render_home():
     top_header()
@@ -271,7 +299,7 @@ def render_tvnim_page():
         for t in traitement: st.markdown("- " + t)
 
         if protocoles:
-            st.markdown("### 📦 Protocoles détaillés (si sélectionnés)")
+            st.markdown("### 📦 Protocoles détaillés")
             for p in protocoles: st.markdown("- " + p)
 
         st.markdown("### 📅 Suivi")
@@ -280,12 +308,8 @@ def render_tvnim_page():
         st.markdown("### 📝 RTUV de second look — rappels (quel que soit le risque)")
         for n in notes_second_look: st.markdown("- " + n)
 
-        # Image de protocole (schéma commun BCG/MMC pour les 3 risques)
-        try:
-            st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
-            st.image(PROTO_IMG_PATH, use_column_width=True, caption="Calendrier indicatif : cystoscopie/cytologie, MMC (induction + entretien possible), BCG (induction + entretien 12/36 mois).")
-        except Exception:
-            st.warning("Image du protocole non trouvée. Vérifie le chemin PROTO_IMG_PATH.")
+        st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
+        show_protocol_image()
 
         # Export
         report_text = build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look)
@@ -307,7 +331,9 @@ def render_generic(label: str):
     st.header(f"🔷 {label}")
     st.info("Module en cours de construction")
 
-# --- Routing ---
+# =========================
+# ROUTING
+# =========================
 page = st.session_state["page"]
 if page == "Accueil":
     render_home()
