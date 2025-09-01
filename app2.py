@@ -12,18 +12,49 @@ st.set_page_config(page_title="Urology Assistant AI", layout="wide")
 # Force un look "mode jour" (clair) via CSS injecté
 st.markdown("""
 <style>
-:root, .stApp, .block-container { background-color: #ffffff !important; color: #111 !important; }
-[data-testid="stHeader"], header { background-color: #ffffff !important; }
-section.main > div { background-color: #ffffff !important; }
-h1,h2,h3,h4,h5,h6 { color:#0E3C6E; }
-.stButton > button { background: #0E3C6E; color: #fff; border-radius: 10px; padding: 0.6rem 1rem; border: none; }
-.stButton > button:hover { background: #154c8a; }
-div[data-baseweb="select"] > div { background: #fff !important; color:#111 !important; }
-.st-emotion-cache-1y4p8pa { color:#111 !important; } /* captions */
-table { background:#fff !important; }
-thead tr th { background:#F2F6FA !important; color:#0E3C6E !important; }
+/* ----- Mode clair de base ----- */
+:root, html, body, .stApp, .block-container { background:#ffffff !important; color:#111 !important; }
+[data-testid="stHeader"], header { background:#ffffff !important; }
+
+/* Titres & liens */
+h1,h2,h3,h4,h5,h6 { color:#0E3C6E !important; }
+a, a:visited { color:#0E3C6E !important; }
+
+/* Texte Markdown (paragraphes, listes, spans) */
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] span,
+[data-testid="stMarkdownContainer"] div {
+  color:#111 !important;
+}
+
+/* ----- TABLES (st.table) ----- */
+[data-testid="stTable"] table { background:#ffffff !important; border-collapse:collapse; }
+[data-testid="stTable"] thead th {
+  background:#F2F6FA !important; color:#0E3C6E !important; font-weight:700 !important;
+  border-bottom:1px solid #dfe8f2 !important;
+}
+[data-testid="stTable"] td, [data-testid="stTable"] th {
+  color:#111 !important; background:#ffffff !important; border-bottom:1px solid #f0f3f7 !important;
+}
+
+/* ----- DataFrames (si jamais on en affiche plus tard) ----- */
+[data-testid="stDataFrame"] { color:#111 !important; }
+[data-testid="stDataFrame"] * { color:#111 !important; }
+
+/* Boutons */
+.stButton > button {
+  background:#0E3C6E !important; color:#fff !important; border-radius:10px; padding:0.6rem 1rem; border:none;
+}
+.stButton > button:hover { background:#154c8a !important; }
+
+/* Sélecteurs & inputs */
+div[data-baseweb="select"] > div, .stTextInput > div > div > input, .stTextArea textarea, .stNumberInput input {
+  background:#fff !important; color:#111 !important;
+}
 </style>
 """, unsafe_allow_html=True)
+
 
 APP_TITLE = "Urology Assistant AI"
 APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 2024–2026"
