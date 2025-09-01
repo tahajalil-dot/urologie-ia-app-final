@@ -1,4 +1,4 @@
-# app.py — Urology Assistant AI
+# app.py — Urology Assistant AI (Accueil + Vessie -> TVNIM/TVIM/Métastatique)
 import streamlit as st
 import base64
 from datetime import datetime
@@ -9,7 +9,10 @@ st.set_page_config(page_title="Urology Assistant AI", layout="wide")
 APP_TITLE = "Urology Assistant AI"
 APP_SUBTITLE = "Assistant intelligent pour la décision clinique aligné AFU 2024–2026"
 
-# Modules principaux
+# Image des protocoles (ton schéma BCG/MMC)
+PROTO_IMG_PATH = "/mnt/data/Capture d’écran 2025-09-01 à 12.19.54.png"  # <- change le chemin si nécessaire
+
+# Modules (page d’accueil)
 MODULES = [
     "Tumeur de la vessie",
     "Tumeurs des voies excrétrices",
@@ -71,8 +74,17 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
         with cols[1]:
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
 
-# --- Stratification TVNIM ---
+# =========================
+# TVNIM — logique clinique (AFU)
+# =========================
 def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str:
+    """
+    AFU (Tableau III) simplifiée avec nos variables :
+    - Faible : pTa bas grade, <3 cm, unifocale
+    - Intermédiaire : pTa bas grade (sans critères haut/très haut)
+    - Haut : pT1 OU haut grade
+    - Très haut : pT1 haut grade + (taille >3 cm OU multifocale/papillomatose)
+    """
     if stade == "pTa" and grade == "Bas grade" and taille_mm < 30 and nombre == "Unique":
         return "faible"
     if stade == "pT1" and grade == "Haut grade" and (taille_mm > 30 or nombre != "Unique"):
@@ -82,51 +94,103 @@ def stratifier_tvnim(stade: str, grade: str, taille_mm: int, nombre: str) -> str
     return "intermédiaire"
 
 def plan_tvnim(risque: str):
+    """
+    Retourne (traitement, suivi, protocoles détaillés, notes_second_look)
+    Doses et schémas usuels (alignés pratique clinique/AFU) — à adapter selon disponibilités locales.
+    """
+    # Notes RTUV second look — à afficher pour TOUS les cas si critères
+    notes_second_look = [
+        "RTUV de second look :",
+        "- Indiquée pour TOUTE tumeur pT1 (réévaluation systématique).",
+        "- Indiquée si tumeur volumineuse et/ou multifocale (1re résection potentiellement incomplète).",
+        "- Indiquée si absence de muscle détrusor dans la pièce initiale.",
+    ]
+
+    # Protocoles / Doses
+    PROTO = {
+        "IPOP": [
+            "IPOP dans les 2 heures (au plus tard 24 h) si pas d’hématurie/perforation :",
+            "• Mitomycine C 40 mg dans 40 mL (instillation unique, rétention 1–2 h),",
+            "  OU Épirubicine 50 mg (40–50 mL),",
+            "  OU Gemcitabine 1 g (50 mL).",
+        ],
+        "CHIMIO_EV": [
+            "Chimiothérapie endovésicale (schéma d’induction 6–8 hebdo) :",
+            "• Mitomycine C 40 mg / 40 mL, 1×/semaine ×6 à 8 semaines.",
+            "• Épirubicine 50 mg / 40–50 mL, 1×/semaine ×6 à 8 semaines.",
+            "• Gemcitabine 1 g / 50 mL, 1×/semaine ×6 à 8 semaines.",
+            "Entretien (optionnel selon risque intermédiaire) : 1 instillation mensuelle ×9 (mois 4→12).",
+        ],
+        "BCG_12M": [
+            "BCG (risque intermédiaire, entretien 12 mois) :",
+            "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
+            "• Entretien 12 mois : 3 instillations aux mois 3, 6, 12 (3×3).",
+            "Dose : flacon standard (dose complète), rétention ~2 h si toléré.",
+        ],
+        "BCG_36M": [
+            "BCG (haut / très haut risque, entretien 36 mois) :",
+            "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
+            "• Entretien 36 mois : 3 instillations à M3, M6, M12, puis tous les 6 mois jusqu’à M36 (schéma 3/6/12 puis /6 mois).",
+            "Dose : flacon standard (dose complète), rétention ~2 h si toléré.",
+        ],
+        "RCP_CYSTECTOMIE": [
+            "En cas de très haut risque :",
+            "• Discussion de cystectomie précoce avec curage ganglionnaire étendu en RCP.",
+        ],
+    }
+
     if risque == "faible":
         traitement = [
-            "RTUV complète et profonde (avec preuve d'infiltration du muscle détrusor ).",
-            "Instillation postopératoire précoce (IPOP) dans les 2 h si pas de CI (mitomycine/épirubicine/gemcitabine), aucun traitement complementaire n'est necessaire.",
+            "RTUV complète et profonde (détrusor présent au compte rendu opératoire).",
+            *PROTO["IPOP"],
+            "Aucun traitement complémentaire d’entretien n’est requis.",
         ]
         suivi = [
             "Cystoscopie : 3e et 12e mois, puis 1×/an pendant 5 ans.",
             "Cytologie : non systématique.",
             "Uro-TDM : non systématique.",
         ]
+        protocoles = []
     elif risque == "intermédiaire":
         traitement = [
-            "RTUV complète (second-look si doute de résection).",
-            "Instillations endovésicales de chimiothérapie (MMC/épirubicine/gemcitabine) : 6–8 instillations hebdomadaires.",
-            "Alternative si besoin : BCG avec entretien 12 mois.",
+            "RTUV complète (second look si doute de résection).",
+            *PROTO["CHIMIO_EV"],
+            "Alternative possible : BCG (induction 6) + entretien 12 mois (si récidives attendues).",
         ]
         suivi = [
-            "Cystoscopie : 3e et 6e mois, puis tous les 6 mois pendant 2 ans, puis 1×/an (≥10 ans).",
+            "Cystoscopie : 3e et 6e mois, puis /6 mois pendant 2 ans, puis 1×/an (au moins 10 ans).",
             "Cytologie : systématique.",
             "Uro-TDM : non systématique.",
         ]
+        protocoles = [*PROTO["BCG_12M"]]
     elif risque == "haut":
         traitement = [
-            "RTUV complète + second-look si pT1 ou muscle absent.",
-            "BCG endovésical : induction (6 instillations) + entretien 3 ans (schéma 3/6/12 mois puis /6 mois).",
-            "Si CI/échec BCG : chimio endovésicale (MMC/gemcitabine ± docétaxel).",
+            "RTUV complète + second look si pT1 ou muscle absent.",
+            *PROTO["BCG_36M"],
+            "Si CI/échec BCG : chimiothérapie endovésicale (MMC/gemcitabine ± docétaxel) selon tolérance.",
         ]
         suivi = [
-            "Cystoscopie : tous les 3 mois pendant 2 ans, puis tous les 6 mois jusqu’à 5 ans, puis 1×/an à vie.",
+            "Cystoscopie : /3 mois pendant 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
             "Uro-TDM : annuel recommandé.",
         ]
+        protocoles = []
     else:  # très haut
         traitement = [
             "RTUV complète (qualité maximale).",
-            "BCG avec entretien 3 ans OU cystectomie précoce avec curage ganglionnaire étendu (selon RCP).",
+            *PROTO["BCG_36M"],
+            *PROTO["RCP_CYSTECTOMIE"],
         ]
         suivi = [
-            "Cystoscopie : tous les 3 mois pendant 2 ans, puis tous les 6 mois jusqu’à 5 ans, puis 1×/an à vie.",
+            "Cystoscopie : /3 mois pendant 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
             "Uro-TDM : annuel obligatoire.",
         ]
-    return traitement, suivi
+        protocoles = []
 
-def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi) -> str:
+    return traitement, suivi, protocoles, notes_second_look
+
+def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look) -> str:
     lines = []
     lines.append("Urology Assistant AI — CAT TVNIM (AFU 2024–2026)")
     lines.append(f"Généré le : {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -141,11 +205,18 @@ def build_report_text(stade, grade, taille, nombre, risque, traitement, suivi) -
     lines.append("")
     lines.append("== Traitement recommandé ==")
     for t in traitement: lines.append(f"• {t}")
+    if protocoles:
+        lines.append("")
+        lines.append("== Détails de protocoles (si retenus) ==")
+        for p in protocoles: lines.append(f"• {p}")
     lines.append("")
     lines.append("== Modalités de suivi ==")
     for s in suivi: lines.append(f"• {s}")
     lines.append("")
-    lines.append("Références : AFU 2024–2026 (Tableau III & IV, reco RTUV).")
+    lines.append("== RTUV de second look : rappels (à considérer quel que soit le risque) ==")
+    for n in notes_second_look: lines.append(f"• {n}")
+    lines.append("")
+    lines.append("Réfs : AFU 2024–2026 — Tableau III (stratification/traitement), Tableau IV (suivi), reco RTUV de qualité.")
     return "\n".join(lines)
 
 def offer_exports(report_text: str):
@@ -159,7 +230,9 @@ def offer_exports(report_text: str):
     st.markdown(f'<a href="data:text/html;base64,{b64_html}" download="CAT_TVNIM.html">📄 Télécharger en HTML</a>', unsafe_allow_html=True)
     st.markdown(f'<a href="data:text/plain;base64,{b64_txt}" download="CAT_TVNIM.txt">📝 Télécharger en TXT</a>', unsafe_allow_html=True)
 
-# --- Pages ---
+# =========================
+# Pages
+# =========================
 def render_home():
     top_header()
     st.markdown("### Sélectionnez une rubrique")
@@ -181,21 +254,41 @@ def render_vessie_menu():
 def render_tvnim_page():
     btn_home_and_back(show_back=True)
     st.header("🔷 TVNIM (tumeur n’infiltrant pas le muscle)")
+
     with st.form("tvnim_form"):
         stade = st.selectbox("Stade tumoral", ["pTa", "pT1"])
         grade = st.selectbox("Grade tumoral", ["Bas grade", "Haut grade"])
         taille = st.slider("Taille maximale (mm)", 1, 100, 10)
         nombre = st.selectbox("Nombre de tumeurs", ["Unique", "Multiple", "Papillomatose vésicale"])
         submitted = st.form_submit_button("🔎 Générer la CAT")
+
     if submitted:
         risque = stratifier_tvnim(stade, grade, taille, nombre)
-        traitement, suivi = plan_tvnim(risque)
+        traitement, suivi, protocoles, notes_second_look = plan_tvnim(risque)
+
         st.subheader(f"📊 Risque estimé : {risque.upper()}")
         st.markdown("### 💊 Traitement")
         for t in traitement: st.markdown("- " + t)
+
+        if protocoles:
+            st.markdown("### 📦 Protocoles détaillés (si sélectionnés)")
+            for p in protocoles: st.markdown("- " + p)
+
         st.markdown("### 📅 Suivi")
         for s in suivi: st.markdown("- " + s)
-        report_text = build_report_text(stade, grade, taille, nombre, risque, traitement, suivi)
+
+        st.markdown("### 📝 RTUV de second look — rappels (quel que soit le risque)")
+        for n in notes_second_look: st.markdown("- " + n)
+
+        # Image de protocole (schéma commun BCG/MMC pour les 3 risques)
+        try:
+            st.markdown("### 🖼️ Schéma visuel des protocoles (BCG / MMC)")
+            st.image(PROTO_IMG_PATH, use_column_width=True, caption="Calendrier indicatif : cystoscopie/cytologie, MMC (induction + entretien possible), BCG (induction + entretien 12/36 mois).")
+        except Exception:
+            st.warning("Image du protocole non trouvée. Vérifie le chemin PROTO_IMG_PATH.")
+
+        # Export
+        report_text = build_report_text(stade, grade, taille, nombre, risque, traitement, suivi, protocoles, notes_second_look)
         st.markdown("### 📤 Export")
         offer_exports(report_text)
 
