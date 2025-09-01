@@ -688,18 +688,14 @@ def render_hbp_page():
         with c4: hematurie_recid = st.checkbox("Hématurie récidivante")
         with c5: ir_post_obstacle = st.checkbox("Altération fonction rénale")
 
-        # Si PSA < 10 : demander PSA libre pour calcul f/t
-        psa_libre = None
-        if psa_total < 10.0:
-            psa_libre = st.number_input("PSA libre (ng/mL) — requis si PSA < 10", min_value=0.0, step=0.05, value=0.3)
+        
 
         submitted = st.form_submit_button("🔎 Générer la CAT – HBP")
 
     if submitted:
         plan = plan_hbp(
             age, volume, lobe_median, ipss, psa_total, tr_suspect, anticoag, preservation_ejac,
-            ci_chirurgie, refus_chir, infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle,
-            psa_libre
+            ci_chirurgie, refus_chir, infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle
         )
 
         render_kv_table("🧾 Données saisies", plan["donnees"])
