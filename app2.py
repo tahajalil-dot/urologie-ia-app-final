@@ -52,7 +52,7 @@ div[data-baseweb="select"] > div,
   height:6px; background:#DFF3E6; border-radius:6px; margin-bottom:12px;
 }
 
-/* ====== TABLEAUX 2 COLONNES (HTML) ====== */
+/* ====== TABLEAUX (HTML) pour Données & Stratification ====== */
 .kv-table { width:100%; border-collapse:separate; border-spacing:0; }
 .kv-table thead th {
   background:#ECF7F0; color:#0B5D3B; font-weight:700; text-align:left;
@@ -65,7 +65,7 @@ div[data-baseweb="select"] > div,
 .kv-table td:first-child { width:38%; }
 .kv-table td strong { color:#0B5D3B; }
 
-/* Espacement entre sections */
+/* Espacement sections */
 .section-block { margin-top: 0.6rem; margin-bottom: 1.2rem; }
 </style>
 """, unsafe_allow_html=True)
@@ -84,7 +84,7 @@ MODULES = [
     "Infectiologie",
 ]
 
-# Couleur décorative (vert clair) pour les barres sous chaque bouton
+# Couleur décorative (vert clair)
 PALETTE = {m: "#DFF3E6" for m in MODULES}
 
 # Etat initial de navigation
@@ -124,13 +124,12 @@ def btn_home_and_back(show_back: bool = False, back_label: str = "Tumeur de la v
             st.button(f"⬅️ Retour : {back_label}", on_click=lambda: go_module(back_label))
 
 # =========================
-# TABLE HELPERS (HTML, 2 colonnes, pas d'index)
+# TABLE HELPERS (HTML 2 colonnes) — pour Données & Stratification
 # =========================
 def esc(x: str) -> str:
     return ihtml.escape(str(x))
 
 def render_kv_table(title: str, pairs: list[tuple[str, str]], col1: str = "Élément", col2: str = "Détail"):
-    """Affiche un tableau 2 colonnes (titre en gras, explication)."""
     if not pairs:
         return
     st.markdown(f"### {esc(title)}")
@@ -139,20 +138,6 @@ def render_kv_table(title: str, pairs: list[tuple[str, str]], col1: str = "Élé
         html.append(f"<tr><td><strong>{esc(k)}</strong></td><td>{esc(v)}</td></tr>")
     html.append("</tbody></table></div>")
     st.markdown("".join(html), unsafe_allow_html=True)
-
-def split_line_to_pair(s: str) -> tuple[str, str]:
-    """
-    Si la ligne contient “:”, on sépare avant/après pour faire (titre, détail).
-    Sinon, on met un point médian en titre et la phrase en détail.
-    """
-    s = s.strip("• ").strip()
-    if ":" in s:
-        a, b = s.split(":", 1)
-        return a.strip(), b.strip()
-    return "•", s
-
-def list_to_pairs(lines: list[str]) -> list[tuple[str, str]]:
-    return [split_line_to_pair(x) for x in lines]
 
 # ------ Export helpers ------
 def build_report_text(title: str, sections: dict) -> str:
@@ -189,10 +174,9 @@ def offer_exports(report_text: str, basename: str):
 #   https://raw.githubusercontent.com/<user>/<repo>/<branch>/assets/protocoles_tvnim.png
 PROTO_URL = ""  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< COLLE TON URL ICI ENTRE GUILLEMETS
 
-# Chemins locaux possibles (si tu ajoutes l’image dans le repo)
 CANDIDATE_PATHS = [
-    Path(__file__).parent / "assets" / "protocoles_tvnim.png",  # assets/protocoles_tvnim.png
-    Path(__file__).parent / "protocoles_tvnim.png",             # ./protocoles_tvnim.png
+    Path(__file__).parent / "assets" / "protocoles_tvnim.png",
+    Path(__file__).parent / "protocoles_tvnim.png",
 ]
 
 def show_protocol_image():
@@ -202,24 +186,16 @@ def show_protocol_image():
             st.image(PROTO_URL.strip(), use_container_width=True, caption="Schéma des protocoles (chargé via URL)")
             return
         except Exception:
-            st.warning("Échec du chargement via l’URL fournie. On tente les fichiers locaux…")
-
+            st.warning("Échec du chargement via l’URL — on tente les fichiers locaux…")
     for p in CANDIDATE_PATHS:
         if p.exists():
             st.image(str(p), use_container_width=True, caption=f"Schéma des protocoles (trouvé : {p.name})")
             return
-
-    up = st.file_uploader("📎 Importer l'image des protocoles (png/jpg)", type=["png", "jpg", "jpeg"])
+    up = st.file_uploader("📎 Importer l'image (png/jpg)", type=["png", "jpg", "jpeg"])
     if up is not None:
         st.image(up, use_container_width=True, caption="Schéma des protocoles (image téléversée)")
     else:
-        st.info(
-            "Aucune image trouvée.\n\n"
-            "Solutions :\n"
-            "• Collez l’URL Raw de l’image dans PROTO_URL (ligne indiquée dans le code),\n"
-            "• ou ajoutez le fichier dans le repo (assets/protocoles_tvnim.png ou ./protocoles_tvnim.png),\n"
-            "• ou importez l’image via le bouton ci-dessus."
-        )
+        st.info("Ajoute une image via PROTO_URL, /assets ou upload ci-dessus.")
 
 # =========================
 # LOGIQUE CLINIQUE — TVNIM (AFU)
@@ -243,12 +219,7 @@ def stratifier_tvnim(
                    atteinte urètre prostatique, formes anatomo-path. agressives)
     """
     facteurs_aggravants = (
-        (taille_mm > 30)
-        or (nombre != "Unique")
-        or cis_associe
-        or lvi
-        or urethre_prostatique
-        or formes_agressives
+        (taille_mm > 30) or (nombre != "Unique") or cis_associe or lvi or urethre_prostatique or formes_agressives
     )
     if stade == "pT1" and grade == "Haut grade" and facteurs_aggravants:
         return "très haut"
@@ -259,6 +230,10 @@ def stratifier_tvnim(
     return "intermédiaire"
 
 def plan_tvnim(risque: str):
+    """
+    Retourne (traitement, suivi, protocoles, notes_second_look)
+    NB: BCG : dose standard = 1 flacon (dose pleine), ex. ~50 mg ≈ 2–8×10^8 UFC ; rétention ~2 h si toléré.
+    """
     notes_second_look = [
         "RTUV de second look recommandée si :",
         "• Tumeur pT1 (réévaluation systématique).",
@@ -269,45 +244,44 @@ def plan_tvnim(risque: str):
     PROTO = {
         "IPOP": [
             "IPOP dans les 2 h (≤24 h) si pas d’hématurie/perforation :",
-            "• Mitomycine C 40 mg dans 40 mL (instillation unique, rétention 1–2 h).",
-            "OU : Épirubicine 50 mg (40–50 mL).",
-            "OU : Gemcitabine 1 g (50 mL).",
+            "• Mitomycine C 40 mg / 40 mL (instillation unique, rétention 1–2 h).",
+            "• ou Épirubicine 50 mg / 40–50 mL.",
+            "• ou Gemcitabine 1 g / 50 mL.",
         ],
         "CHIMIO_EV": [
             "Chimiothérapie endovésicale — Induction hebdomadaire 6–8 :",
             "• MMC 40 mg / 40 mL, 1×/semaine ×6–8.",
             "• Épirubicine 50 mg / 40–50 mL, 1×/semaine ×6–8.",
             "• Gemcitabine 1 g / 50 mL, 1×/semaine ×6–8.",
-            "Entretien (option) : 1 instillation mensuelle ×9 (mois 4→12).",
+            "Entretien (intermédiaire) : 1 instillation mensuelle ×9 (mois 4→12).",
+        ],
+        "BCG_BASE": [
+            "BCG — dose : 1 flacon (dose pleine), ex. ~50 mg ≈ 2–8×10^8 UFC ; rétention ~2 h si toléré.",
         ],
         "BCG_12M": [
             "BCG — maintien 12 mois (risque intermédiaire) :",
-            "Induction : 6 instillations hebdomadaires (semaines 1–6).",
-            "Entretien : 3 instillations aux mois 3, 6 et 12 (3×3).",
-            "Dose : flacon complet, rétention ~2 h si toléré.",
+            "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
+            "• Entretien 12 mois : 3 instillations aux mois 3, 6 et 12 (schéma 3×3).",
         ],
         "BCG_36M": [
             "BCG — maintien 36 mois (haut / très haut) :",
-            "Induction : 6 instillations hebdomadaires (semaines 1–6).",
-            "Entretien : 3 instillations à M3, M6, M12, puis /6 mois jusqu’à M36.",
-            "Dose : flacon complet, rétention ~2 h si toléré.",
+            "• Induction : 6 instillations hebdomadaires (semaines 1–6).",
+            "• Entretien : 3 instillations à M3, M6, M12, puis tous les 6 mois jusqu’à M36.",
         ],
         "RCP_CYSTECTOMIE": [
-            "Très haut risque :",
-            "Discussion RCP pour cystectomie précoce + curage étendu.",
+            "Très haut risque : discussion RCP pour cystectomie précoce + curage étendu.",
         ],
     }
 
     if risque == "faible":
         traitement = [
-            "RTUV complète et profonde : mention du détrusor au CR.",
+            "RTUV complète et profonde (mention du détrusor au CR).",
             *PROTO["IPOP"],
-            "Aucun traitement d’entretien requis.",
+            "Pas d’entretien nécessaire.",
         ]
         suivi = [
             "Cystoscopie : 3e et 12e mois, puis 1×/an pendant 5 ans.",
             "Cytologie : non systématique.",
-            "Uro-TDM : non systématique.",
         ]
         protocoles = []
     elif risque == "intermédiaire":
@@ -315,37 +289,36 @@ def plan_tvnim(risque: str):
             "RTUV complète (second look si doute d’exérèse).",
             *PROTO["CHIMIO_EV"],
             "Alternative : BCG (induction 6) + entretien 12 mois selon profil.",
+            *PROTO["BCG_BASE"],
         ]
         suivi = [
             "Cystoscopie : 3e et 6e mois, puis /6 mois pendant 2 ans, puis 1×/an (≥10 ans).",
             "Cytologie : systématique.",
-            "Uro-TDM : non systématique.",
         ]
         protocoles = [*PROTO["BCG_12M"]]
     elif risque == "haut":
         traitement = [
             "RTUV complète + second look si pT1 ou muscle absent.",
-            *PROTO["BCG_36M"],
-            "Si CI/échec BCG : chimio EV (MMC/gemcitabine ± docétaxel).",
+            "BCG endovésical (dose standard, voir ci-dessous) avec entretien 36 mois.",
+            *PROTO["BCG_BASE"],
         ]
         suivi = [
             "Cystoscopie : /3 mois × 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
-            "Uro-TDM : annuel recommandé.",
         ]
-        protocoles = []
+        protocoles = [*PROTO["BCG_36M"]]
     else:  # très haut
         traitement = [
             "RTUV complète (qualité maximale).",
-            *PROTO["BCG_36M"],
+            "BCG (dose standard, voir ci-dessous) avec entretien 36 mois OU cystectomie précoce (RCP).",
+            *PROTO["BCG_BASE"],
             *PROTO["RCP_CYSTECTOMIE"],
         ]
         suivi = [
             "Cystoscopie : /3 mois × 2 ans, puis /6 mois jusqu’à 5 ans, puis 1×/an à vie.",
             "Cytologie : systématique.",
-            "Uro-TDM : annuel obligatoire.",
         ]
-        protocoles = []
+        protocoles = [*PROTO["BCG_36M"]]
 
     return traitement, suivi, protocoles, notes_second_look
 
@@ -365,6 +338,11 @@ def plan_tvim(
     post_op_high_risk: bool,
     neo_adjuvant_fait: bool,
 ):
+    """
+    • NAC cisplatine si éligible → cystectomie (standard)
+    • Option préservation vésicale (TMT) : RTUV max + radiothérapie + radiosensibilisation (pas de dose RT détaillée ici)
+    • Adjuvant (si pT3–4/pN+ ou pas de NAC) : chimio ± immuno selon contexte
+    """
     res = {"traitement": [], "surveillance": [], "notes": []}
 
     if metastases:
@@ -375,19 +353,18 @@ def plan_tvim(
     if cis_eligible:
         res["traitement"] += [
             "Chimiothérapie néoadjuvante (NAC) avant cystectomie :",
-            "Gemcitabine + Cisplatine (GC), q21j × 4 cycles : Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.",
-            "OU : dd-MVAC (q14j × 4) avec G-CSF : MTX 30 mg/m² J1, VBL 3 mg/m² J2, DOX 30 mg/m² J2, CDDP 70 mg/m² J2.",
+            "• Gemcitabine + Cisplatine (GC), q21j × 4 cycles : Gemcitabine 1 000 mg/m² J1 & J8, Cisplatine 70 mg/m² J1.",
+            "• ou dd-MVAC (q14j × 4) avec G-CSF : MTX 30 mg/m² J1, VBL 3 mg/m² J2, DOX 30 mg/m² J2, CDDP 70 mg/m² J2.",
         ]
     else:
         res["traitement"].append("Non éligible cisplatine : NAC non standard.")
 
-    # Option TMT
+    # Option TMT (sans préciser la dose RT, comme demandé)
     if t2_localise and (not hydron) and bonne_fct_v and (not cis_diffus):
         res["traitement"] += [
-            "Option conservatrice (TMT) si patient informé :",
-            "RTUV maximale (résection complète) + radiochimiothérapie concomitante.",
-            "Radiothérapie vésicale 64–66 Gy (ex : 55 Gy/20 fx ou 64 Gy/32 fx).",
-            "Radiosensibilisation : 5-FU 500 mg/m² J1–5 & J16–20 + MMC 12 mg/m² J1, OU Cisplatine hebdo 30–40 mg/m².",
+            "Option préservation vésicale (TMT) — décision partagée :",
+            "• RTUV maximale (résection complète) + radiothérapie vésicale + radiosensibilisation.",
+            "• Radiosensibilisation usuelle : 5-FU + Mitomycine C, ou cisplatine hebdomadaire (selon éligibilité).",
         ]
         res["notes"] += [
             "CI relatives TMT : hydronéphrose, CIS diffus, mauvaise capacité vésicale, tumeur non résécable.",
@@ -396,7 +373,7 @@ def plan_tvim(
 
     # Cystectomie
     res["traitement"] += [
-        "Cystectomie radicale + curage ganglionnaire étendu (si pas de TMT) :",
+        "Cystectomie radicale + curage ganglionnaire étendu (si pas de TMT).",
         "Dérivation : conduit iléal / néovessie orthotopique (urètre indemne, bonne fonction rénale/hépatique).",
     ]
 
@@ -404,8 +381,8 @@ def plan_tvim(
     if post_op_high_risk or (not neo_adjuvant_fait):
         res["traitement"].append("Adjuvant à discuter :")
         if cis_eligible and (not neo_adjuvant_fait) and post_op_high_risk:
-            res["traitement"].append("Chimiothérapie adjuvante (GC q21j × 4 ou dd-MVAC q14j × 4) si pT3–4/pN+.")
-        res["traitement"].append("Immunothérapie adjuvante : Nivolumab 240 mg q2s ou 480 mg q4s, 1 an (selon AMM/PD-L1).")
+            res["traitement"].append("• Chimiothérapie adjuvante (GC q21j × 4 ou dd-MVAC q14j × 4) si pT3–4/pN+.")
+        res["traitement"].append("• Immunothérapie adjuvante : Nivolumab 240 mg q2s ou 480 mg q4s, 1 an (selon AMM/PD-L1).")
 
     # Suivi
     res["surveillance"] += [
@@ -420,7 +397,7 @@ def plan_tvim(
 
     res["notes"] += [
         "Décision partagée en RCP (NAC vs TMT vs cystectomie).",
-        "Doses indicatives à valider par oncologie/pharmacie (clairance, comorbidités).",
+        "Doses à valider par oncologie/pharmacie (clairance, comorbidités).",
     ]
     return res
 
@@ -441,8 +418,8 @@ def plan_meta(
     if platinum_naive:
         if cis_eligible:
             res["traitement"] += [
-                "1re ligne : GC q21j × 4–6 (Gemcitabine 1 000 mg/m² J1 & J8 + Cisplatine 70 mg/m² J1).",
-                "OU : dd-MVAC q14j × 4–6 avec G-CSF.",
+                "1re ligne : Gemcitabine + Cisplatine (GC) q21j × 4–6 (GEM 1 000 mg/m² J1 & J8 + CDDP 70 mg/m² J1).",
+                "ou dd-MVAC q14j × 4–6 avec G-CSF.",
                 "Maintenance Avelumab 800 mg IV q2s si réponse/SD après platine.",
             ]
         elif carbo_eligible:
@@ -461,14 +438,14 @@ def plan_meta(
         if prior_platinum and prior_cpi:
             res["traitement"] += [
                 "Après platine + CPI : Enfortumab Vedotin 1,25 mg/kg J1/J8/J15 q28j (si dispo).",
-                "OU : Sacituzumab Govitecan 10 mg/kg J1/J8 q21j (si dispo).",
+                "ou Sacituzumab Govitecan 10 mg/kg J1/J8 q21j (si dispo).",
             ]
         if (not prior_platinum):
             res["traitement"].append("Jamais exposé au platine : envisager GC ou Gem-Carbo selon éligibilité.")
 
     if bone_mets:
         res["traitement"] += [
-            "Os-protecteurs : Acide zolédronique 4 mg IV q4s (adapter à DFG) OU Dénosumab 120 mg SC q4s + Ca/VitD.",
+            "Os-protecteurs : Acide zolédronique 4 mg IV q4s (adapter à DFG) ou Dénosumab 120 mg SC q4s + Ca/VitD.",
         ]
         res["notes"].append("Prévenir l’ostéonécrose mandibulaire (bilan dentaire).")
 
@@ -480,7 +457,7 @@ def plan_meta(
 
     res["notes"] += [
         "Adapter à l’AMM locale/essais/stock. Décisions en RCP.",
-        "Doses indicatives à valider avec oncologie/pharmacie.",
+        "Doses à valider avec oncologie/pharmacie.",
     ]
     return res
 
@@ -537,7 +514,7 @@ def render_tvnim_page():
         )
         traitement, suivi, protocoles, notes_second_look = plan_tvnim(risque)
 
-        # Données (paires)
+        # Données & Stratification (en tableaux)
         donnees_pairs = [
             ("Stade", stade),
             ("Grade", grade),
@@ -550,14 +527,21 @@ def render_tvnim_page():
             if urethre_prostatique: donnees_pairs.append(("Atteinte urètre prostatique", "Oui"))
             if formes_agressives: donnees_pairs.append(("Formes anatomo-path. agressives", "Oui"))
 
-        # Rendu des tableaux
-        render_kv_table("📊 Stratification", [("Risque estimé", risque.upper())], "Élément", "Résultat")
         render_kv_table("🧾 Données saisies", donnees_pairs)
-        render_kv_table("💊 Traitement recommandé", list_to_pairs(traitement))
+        render_kv_table("📊 Stratification", [("Risque estimé", risque.upper())], "Élément", "Résultat")
+
+        # Recommandations (en listes — plus robuste partout)
+        st.markdown("### 💊 Traitement recommandé")
+        for t in traitement: st.markdown("- " + t)
         if protocoles:
-            render_kv_table("📦 Protocoles détaillés", list_to_pairs(protocoles))
-        render_kv_table("📅 Modalités de suivi", list_to_pairs(suivi))
-        render_kv_table("📝 RTUV de second look — rappels", list_to_pairs(notes_second_look))
+            st.markdown("### 📦 Protocoles BCG (schémas)")
+            for p in protocoles: st.markdown("- " + p)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for s in suivi: st.markdown("- " + s)
+
+        st.markdown("### 📝 RTUV de second look — rappels")
+        for n in notes_second_look: st.markdown("- " + n)
 
         show_protocol_image()
 
@@ -601,6 +585,7 @@ def render_tvim_page():
             neo_adjuvant_fait=neo_adjuvant_fait
         )
 
+        # Données / Stratification (table pour données; pas de strat dans TVIM)
         donnees_pairs = [
             ("T", t_cat),
             ("cN+", "Oui" if cN_pos else "Non"),
@@ -614,12 +599,17 @@ def render_tvim_page():
             ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"),
             ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
         ]
-
         render_kv_table("🧾 Données saisies", donnees_pairs)
-        render_kv_table("💊 Traitement recommandé", list_to_pairs(plan["traitement"]))
-        render_kv_table("📅 Modalités de suivi", list_to_pairs(plan["surveillance"]))
+
+        st.markdown("### 💊 Traitement recommandé")
+        for x in plan["traitement"]: st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["surveillance"]: st.markdown("- " + x)
+
         if plan["notes"]:
-            render_kv_table("📝 Notes", list_to_pairs(plan["notes"]))
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]: st.markdown("- " + x)
 
         sections = {
             "Données": [f"{k}: {v}" for k, v in donnees_pairs],
@@ -661,12 +651,17 @@ def render_vessie_meta_page():
             ("CPI reçu", "Oui" if prior_cpi else "Non"),
             ("Métastases osseuses", "Oui" if bone_mets else "Non"),
         ]
-
         render_kv_table("🧾 Données saisies", donnees_pairs)
-        render_kv_table("💊 Traitement recommandé", list_to_pairs(plan["traitement"]))
-        render_kv_table("📅 Modalités de suivi", list_to_pairs(plan["suivi"]))
+
+        st.markdown("### 💊 Traitement recommandé")
+        for x in plan["traitement"]: st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]: st.markdown("- " + x)
+
         if plan["notes"]:
-            render_kv_table("📝 Notes", list_to_pairs(plan["notes"]))
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]: st.markdown("- " + x)
 
         sections = {
             "Données": [f"{k}: {v}" for k, v in donnees_pairs],
