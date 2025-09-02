@@ -706,43 +706,6 @@ def render_hbp_page():
         }
         report_text = build_report_text("CAT HBP (triage PSAD)", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_HBP")
-
-
-# =========================
-# ROUTING + FALLBACK
-# =========================
-
-def render_home_wrapper():
-    top_header()
-    st.markdown("### Sélectionnez une rubrique")
-    st.caption(APP_SUBTITLE)
-    col1, col2 = st.columns(2)
-    for i, mod in enumerate(MODULES):
-        with (col1 if i % 2 == 0 else col2):
-            category_button(mod, PALETTE[mod], key=f"btn_{i}")
-
-
-def render_generic(page_label: str):
-    btn_home_and_back()
-    st.header(page_label)
-    st.info("Module en cours de construction.")
-
-
-page = st.session_state["page"]
-if page == "Accueil":
-    render_home_wrapper()
-elif page == "Tumeur de la vessie":
-    render_vessie_menu()
-elif page == "Vessie: TVNIM":
-    render_tvnim_page()
-elif page == "Vessie: TVIM":
-    render_tvim_page()
-elif page == "Vessie: Métastatique":
-    render_vessie_meta_page()
-elif page == "Hypertrophie bénigne de la prostate (HBP)":
-    render_hbp_page()
-else:
-    render_generic(page)
 # =========================
 # LOGIQUE CLINIQUE — Rein (localisé + métastatique)
 # =========================
@@ -1114,3 +1077,40 @@ def render_kidney_meta_page():
         }
         report_text = build_report_text("CAT Rein métastatique", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Rein_Metastatique")
+
+
+# =========================
+# ROUTING + FALLBACK
+# =========================
+
+def render_home_wrapper():
+    top_header()
+    st.markdown("### Sélectionnez une rubrique")
+    st.caption(APP_SUBTITLE)
+    col1, col2 = st.columns(2)
+    for i, mod in enumerate(MODULES):
+        with (col1 if i % 2 == 0 else col2):
+            category_button(mod, PALETTE[mod], key=f"btn_{i}")
+
+
+def render_generic(page_label: str):
+    btn_home_and_back()
+    st.header(page_label)
+    st.info("Module en cours de construction.")
+
+
+page = st.session_state["page"]
+if page == "Accueil":
+    render_home_wrapper()
+elif page == "Tumeur de la vessie":
+    render_vessie_menu()
+elif page == "Vessie: TVNIM":
+    render_tvnim_page()
+elif page == "Vessie: TVIM":
+    render_tvim_page()
+elif page == "Vessie: Métastatique":
+    render_vessie_meta_page()
+elif page == "Hypertrophie bénigne de la prostate (HBP)":
+    render_hbp_page()
+else:
+    render_generic(page)
