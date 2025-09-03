@@ -1050,6 +1050,331 @@ def plan_tves_metastatique(
         "notes": notes,
     }
 
+# =========================
+# LOGIQUE CLINIQUE — INFECTIO (Grossesse, Cystite, PNA, Prostatite)
+# =========================
+
+def _flags_severite(seps_sbp_lt90: bool, seps_hr_gt120: bool, confusion: bool, vomissements: bool, obstruction_suspecte: bool):
+    """Retourne (est_grave: bool, raisons: list[str])"""
+    raisons = []
+    if seps_sbp_lt90: raisons.append("Hypotension (sepsis/choc)")
+    if seps_hr_gt120: raisons.append("Tachycardie >120/min")
+    if confusion: raisons.append("Troubles neuro (confusion)")
+    if vomissements: raisons.append("Vomissements empêchant la voie orale")
+    if obstruction_suspecte: raisons.append("Obstacle/suspicion de colique ou anurie")
+    grave = bool(seps_sbp_lt90 or seps_hr_gt120 or confusion or obstruction_suspecte or vomissements)
+    return grave, raisons
+
+
+def _is_risque_complication(
+    homme: bool=False, grossesse: bool=False, age_ge65_fragile: bool=False, anomalies_uro: bool=False,
+    immunodep: bool=False, irc_significative: bool=False, sonde: bool=False, diabete_non_controle: bool=False
+):
+    """Facteurs de risque de complication (hors gravité)"""
+    return any([homme, grossesse, age_ge65_fragile, anomalies_uro, immunodep, irc_significative, sonde, diabete_non_controle])
+
+
+# ---------- CYSTITE (plutôt femme, hors grossesse) ----------
+
+def plan_cystite(
+    age: int,
+    fievre_ge_38_5: bool,
+    lombalgies: bool,
+    douleurs_intenses: bool,
+    hematurie: bool,
+    recidivante: bool,
+    homme: bool,
+    grossesse: bool,
+    age_ge65_fragile: bool,
+    anomalies_uro: bool,
+    immunodep: bool,
+    irc_significative: bool,
+    sonde: bool,
+    diabete_non_controle: bool,
+    seps_sbp_lt90: bool,
+    seps_hr_gt120: bool,
+    confusion: bool,
+    vomissements: bool,
+):
+    """
+    Classe: simple / à risque de complication / grave (suspicion pyélo ou sepsis).
+    """
+    donnees = [
+        ("Âge", f"{age} ans"),
+        ("Fièvre ≥ 38,5°C", "Oui" if fievre_ge_38_5 else "Non"),
+        ("Douleur lombaire", "Oui" if lombalgies else "Non"),
+        ("Douleur intense", "Oui" if douleurs_intenses else "Non"),
+        ("Hématurie", "Oui" if hematurie else "Non"),
+        ("Récidivante", "Oui" if recidivante else "Non"),
+        ("Sexe masculin", "Oui" if homme else "Non"),
+        ("Grossesse", "Oui" if grossesse else "Non"),
+        ("≥65 ans fragile", "Oui" if age_ge65_fragile else "Non"),
+        ("Anomalies uro/obstacle", "Oui" if anomalies_uro else "Non"),
+        ("Immunodépression", "Oui" if immunodep else "Non"),
+        ("IR chronique significative", "Oui" if irc_significative else "Non"),
+        ("Sonde urinaire", "Oui" if sonde else "Non"),
+        ("Diabète non contrôlé", "Oui" if diabete_non_controle else "Non"),
+    ]
+    obstruction_suspecte = anomalies_uro
+    grave, raisons_grav = _flags_severite(seps_sbp_lt90, seps_hr_gt120, confusion, vomissements, obstruction_suspecte)
+
+    # Pyélo suspectée si fièvre/lombalgies/douleurs importantes → bascule vers prise en charge PNA
+    suspicion_pyelo = fievre_ge_38_5 or lombalgies or douleurs_intenses
+
+    risque = "Grave" if grave or suspicion_pyelo else ("À risque de complication" if _is_risque_complication(
+        homme, grossesse, age_ge65_fragile, anomalies_uro, immunodep, irc_significative, sonde, diabete_non_controle
+    ) else "Simple")
+
+    classification = [("Catégorie", risque)]
+    if grave or suspicion_pyelo:
+        classification.append(("Arguments de gravité/suspicion PNA", ", ".join(raisons_grav) if raisons_grav else "Fièvre/douleur lombaire"))
+
+    options = []
+    idx = 1
+    notes = []
+    suivi = []
+
+    # Conduites + probabiliste
+    if risque == "Simple":
+        options.append(f"Option {idx} : Probabiliste — Fosfomycine-trométamol (dose unique)."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — Pivmécillinam (5–7 jours)."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — Nitrofurantoïne (5 jours)."); idx += 1
+        options.append(f"Option {idx} : Alternative — Fluoroquinolone courte (si alternatives inadaptées/locales)."); idx += 1
+
+        suivi = [
+            "ECBU non systématique si évolution typique; reconsulter si non amélioration en 48–72 h.",
+            "Si non amélioration 48–72 h : réaliser ECBU, réévaluer diagnostic, envisager écho rénale (± uro-TDM si fièvre/douleurs).",
+            "Si récidivantes : mesures hygiéno-diététiques; ECBU à chaque épisode pour différencier rechute/reinfection.",
+        ]
+
+    elif risque == "À risque de complication":
+        options.append(f"Option {idx} : ECBU avant ATB si possible, puis Probabiliste — Nitrofurantoïne (7 jours)."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — Céfixime (5–7 jours) selon éco locale."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — Fluoroquinolone (≈5 jours) si alternatives inadaptées."); idx += 1
+
+        suivi = [
+            "ECBU systématique AVANT antibiothérapie si possible; adapter au résultat sous 48–72 h.",
+            "Si non amélioration 48–72 h : contrôle ECBU, vérifier observance et interactions; imagerie si fièvre/douleur (écho ± uro-TDM).",
+        ]
+        notes.append("Éviter fosfomycine/nitrofurantoïne chez l’homme (préférer prostatite : voir module dédié).")
+
+    else:  # Grave
+        options.append(f"Option {idx} : Suspect PNA/sepsis → bascule vers protocole PNA (voir rubrique PNA)."); idx += 1
+        options.append(f"Option {idx} : Hospitalisation si signes de sepsis/choc, vomissements, ou obstacle suspect."); idx += 1
+        suivi = [
+            "ECBU + hémocultures avant ATB; antibiothérapie IV probabiliste; imagerie (uro-TDM ≤24 h) si douleur/fièvre prolongée/obstacle.",
+        ]
+
+    # Étapes communes
+    if risque != "Simple":
+        notes.append("Toujours adapter l’antibiothérapie à l’antibiogramme (48–72 h).")
+    return {"donnees": donnees, "classification": classification, "traitement": options, "suivi": suivi, "notes": notes}
+
+
+# ---------- PYÉLONÉPHRITE AIGUË (PNA) ----------
+
+def plan_pna(
+    fievre_ge_38_5: bool,
+    douleur_lombaire: bool,
+    vomissements: bool,
+    homme: bool,
+    grossesse: bool,
+    age_ge65_fragile: bool,
+    anomalies_uro: bool,
+    immunodep: bool,
+    irc_significative: bool,
+    sonde: bool,
+    diabete_non_controle: bool,
+    seps_sbp_lt90: bool,
+    seps_hr_gt120: bool,
+    confusion: bool,
+):
+    donnees = [
+        ("Fièvre ≥ 38,5°C", "Oui" if fievre_ge_38_5 else "Non"),
+        ("Douleur lombaire", "Oui" if douleur_lombaire else "Non"),
+        ("Vomissements", "Oui" if vomissements else "Non"),
+        ("Sexe masculin", "Oui" if homme else "Non"),
+        ("Grossesse", "Oui" if grossesse else "Non"),
+        ("≥65 ans fragile", "Oui" if age_ge65_fragile else "Non"),
+        ("Anomalies uro/obstacle", "Oui" if anomalies_uro else "Non"),
+        ("Immunodépression", "Oui" if immunodep else "Non"),
+        ("IR chronique significative", "Oui" if irc_significative else "Non"),
+        ("Sonde urinaire", "Oui" if sonde else "Non"),
+        ("Diabète non contrôlé", "Oui" if diabete_non_controle else "Non"),
+    ]
+    obstruction_suspecte = anomalies_uro
+    grave, raisons_grav = _flags_severite(seps_sbp_lt90, seps_hr_gt120, confusion, vomissements, obstruction_suspecte)
+
+    if grave:
+        categorie = "Grave"
+    else:
+        categorie = "À risque de complication" if _is_risque_complication(
+            homme, grossesse, age_ge65_fragile, anomalies_uro, immunodep, irc_significative, sonde, diabete_non_controle
+        ) else "Simple"
+
+    classification = [("Catégorie", categorie)]
+    if raisons_grav:
+        classification.append(("Critères de gravité", ", ".join(raisons_grav)))
+
+    options = []
+    idx = 1
+    notes = []
+    suivi = []
+
+    # Probabiliste par catégorie
+    if categorie == "Simple":
+        options.append(f"Option {idx} : Probabiliste — Fluoroquinolone per os (si épidémiologie locale favorable)."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — C3G (ex. ceftriaxone) dose initiale IV/IM puis relais per os."); idx += 1
+        options.append(f"Option {idx} : Alternative — Bêta-lactamine parentérale en relais PO (durée totale 7–10 jours)."); idx += 1
+
+        suivi = [
+            "ECBU systématique (avant ATB si possible).",
+            "Réévaluation clinique/biologique à 48–72 h; adapter à l’antibiogramme.",
+            "Imagerie non systématique au départ; réaliser une écho si douleur inhabituelle, calcul connu, ou si non amélioration 48–72 h.",
+        ]
+
+    elif categorie == "À risque de complication":
+        options.append(f"Option {idx} : Probabiliste — C3G IV (ex. cefotaxime/ceftriaxone) ± amikacine selon gravité locale."); idx += 1
+        options.append(f"Option {idx} : Alternative — BLSE suspecté : carbapénème ± amikacine."); idx += 1
+
+        suivi = [
+            "ECBU + hémocultures avant ATB; imagerie uro-TDM ≤24 h si douleur sévère, fièvre persistante, ou obstacle suspect.",
+            "Réévaluation à 48–72 h : adapter ATB; relais per os dès apyrexie/prise orale possible; durée 10–14 jours (selon molécule).",
+        ]
+
+    else:  # Grave
+        options.append(f"Option {idx} : Hospitalisation d’emblée."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — C3G IV + amikacine; si BLSE suspecté → carbapénème + amikacine."); idx += 1
+        options.append(f"Option {idx} : Drainage urgent si obstacle (JJ/néphrostomie) après avis urologique."); idx += 1
+
+        suivi = [
+            "ECBU + hémocultures; bilan biologique complet.",
+            "Uro-TDM en urgence si obstacle suspecté; sinon ≤24 h si état sévère persistant.",
+            "Réévaluation 24–48 h : adapter; surveillance rapprochée (PA/FC/SpO2/diurèse).",
+        ]
+
+    notes.append("Adapter systématiquement au résultat de l’antibiogramme (48–72 h).")
+    return {"donnees": donnees, "classification": classification, "traitement": options, "suivi": suivi, "notes": notes}
+
+
+# ---------- GROSSESSE (bactériurie, cystite, PNA) ----------
+
+def plan_grossesse(
+    type_tableau: str,  # "Bactériurie asymptomatique", "Cystite", "PNA"
+    terme_9e_mois: bool,
+    allergies_betalactamines: bool,
+    seps_sbp_lt90: bool,
+    seps_hr_gt120: bool,
+    vomissements: bool,
+):
+    donnees = [
+        ("Tableau", type_tableau),
+        ("9e mois (nitrofurantoïne à éviter)", "Oui" if terme_9e_mois else "Non"),
+        ("Allergie bêta-lactamines", "Oui" if allergies_betalactamines else "Non"),
+    ]
+    grave, raisons_grav = _flags_severite(seps_sbp_lt90, seps_hr_gt120, False, vomissements, False)
+
+    options = []
+    idx = 1
+    suivi = []
+    notes = []
+
+    if type_tableau in ("Bactériurie asymptomatique", "Cystite"):
+        # Toujours à risque (grossesse) mais hors gravité
+        options.append(f"Option {idx} : Probabiliste — Amoxicilline / Pivmécillinam / Fosfomycine (dose unique) / Céfixime (selon contexte local)."); idx += 1
+        if not terme_9e_mois:
+            options.append(f"Option {idx} : Alternative — Nitrofurantoïne (éviter au 9e mois)."); idx += 1
+        options.append(f"Option {idx} : Alternative — Triméthoprime (à partir du 2e trimestre) si autres CI."); idx += 1
+
+        suivi = [
+            "ECBU AVANT traitement; contrôle ECBU 48 h après début si symptômes persistants; ECBU de contrôle 8–10 jours après fin du traitement.",
+            "Dépistage mensuel ultérieur de la bactériurie pendant la grossesse.",
+            "Si non amélioration à 48–72 h : réévaluer, refaire ECBU, envisager écho rénale.",
+        ]
+
+    else:  # PNA gravidique
+        options.append(f"Option {idx} : Hospitalisation d’emblée."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — C3G IV (ex. ceftriaxone) ± amikacine selon gravité."); idx += 1
+        options.append(f"Option {idx} : Alternative — Selon allergie BL, discuter aztréonam ± aminoside (avis spécialisé)."); idx += 1
+
+        suivi = [
+            "ECBU + hémocultures avant ATB; surveillance obstétricale.",
+            "Imagerie en cas de non réponse 48–72 h ou douleur atypique (écho; uro-TDM si indispensable).",
+            "Durée minimale 14 jours; relais per os dès que possible; ECBU de contrôle à 8–10 jours après fin.",
+        ]
+
+    if grave:
+        notes.append("Signes de gravité (ex. sepsis, vomissements) → hospitalisation et traitement IV.")
+    notes.append("Adapter systématiquement à l’antibiogramme (48–72 h).")
+    return {"donnees": donnees, "classification": [("Gravité", "Oui" if grave else "Non")], "traitement": options, "suivi": suivi, "notes": notes}
+
+
+# ---------- HOMME — PROSTATITE AIGUË (IU masculine) ----------
+
+def plan_prostatite(
+    fievre_ge_38_5: bool,
+    douleurs_perineales: bool,
+    dysurie: bool,
+    retention: bool,
+    post_biopsie_prostate: bool,
+    immunodep: bool,
+    irc_significative: bool,
+    seps_sbp_lt90: bool,
+    seps_hr_gt120: bool,
+    confusion: bool,
+):
+    donnees = [
+        ("Fièvre ≥ 38,5°C", "Oui" if fievre_ge_38_5 else "Non"),
+        ("Douleurs périnéales", "Oui" if douleurs_perineales else "Non"),
+        ("Dysurie", "Oui" if dysurie else "Non"),
+        ("Rétention aiguë", "Oui" if retention else "Non"),
+        ("Contexte post-biopsie", "Oui" if post_biopsie_prostate else "Non"),
+        ("Immunodépression", "Oui" if immunodep else "Non"),
+        ("IR chronique significative", "Oui" if irc_significative else "Non"),
+    ]
+    obstruction_suspecte = retention
+    grave, raisons_grav = _flags_severite(seps_sbp_lt90, seps_hr_gt120, confusion, False, obstruction_suspecte)
+
+    # Toute IU masculine = à risque; grave si sepsis/retention/post-biopsie fébrile
+    categorie = "Grave" if grave or post_biopsie_prostate else "À risque de complication"
+
+    classification = [("Catégorie", categorie)]
+    if raisons_grav or post_biopsie_prostate:
+        r = raisons_grav.copy()
+        if post_biopsie_prostate: r.append("Contexte post-biopsie")
+        classification.append(("Critères", ", ".join(r)))
+
+    options = []
+    idx = 1
+    notes = []
+    suivi = []
+
+    if categorie == "À risque de complication":
+        options.append(f"Option {idx} : Probabiliste — Fluoroquinolone (bonne diffusion prostatique) **ou** TMP-SMX (relais documenté)."); idx += 1
+        options.append(f"Option {idx} : Alternative — Dose initiale C3G (ceftriaxone) puis relais per os (FQ/TMP-SMX) selon ATBgramme."); idx += 1
+
+        suivi = [
+            "ECBU systématique (avant ATB si possible) ± hémocultures si fièvre.",
+            "Réévaluation 48–72 h; adapter à l’antibiogramme; durée totale ≥14 jours (souvent 14–21 jours).",
+            "Éviter nitrofurantoïne, fosfomycine, amoxicilline+acide clavulanique, céfixime (diffusion prostatique insuffisante).",
+        ]
+
+    else:  # Grave ou post-biopsie
+        options.append(f"Option {idx} : Hospitalisation/prise en charge rapprochée."); idx += 1
+        options.append(f"Option {idx} : Probabiliste — C3G IV + amikacine; relais per os par FQ/TMP-SMX dès amélioration."); idx += 1
+        if post_biopsie_prostate:
+            options.append(f"Option {idx} : Contexte post-biopsie — Bi-antibiothérapie IV d’emblée (C3G + aminoside)."); idx += 1
+        if retention:
+            options.append(f"Option {idx} : Drainage vésical (sondage sus-pubien privilégié) après avis."); idx += 1
+
+        suivi = [
+            "ECBU + hémocultures; bilan biologique.",
+            "Échographie si rétention/douleur; uro-TDM si évolution défavorable.",
+            "Réévaluation 24–48 h; adapter ATB; durée totale 14–21 jours.",
+        ]
+
+    notes.append("Adapter systématiquement au résultat de l’antibiogramme (48–72 h).")
+    return {"donnees": donnees, "classification": classification, "traitement": options, "suivi": suivi, "notes": notes}
 
 # =========================
 # PAGES (UI)
@@ -1318,6 +1643,178 @@ def render_tves_meta_page():
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Metastatique")
 
 
+def render_infectio_menu():
+    btn_home_and_back()
+    st.markdown("## Infectiologie — Infections urinaires")
+    st.caption("Choisissez le sous-module")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.button("Grossesse", use_container_width=True, on_click=lambda: go_module("IU: Grossesse"))
+        st.button("Cystite", use_container_width=True, on_click=lambda: go_module("IU: Cystite"))
+    with c2:
+        st.button("Pyélonéphrite aiguë (PNA)", use_container_width=True, on_click=lambda: go_module("IU: PNA"))
+        st.button("Infection masculine (Prostatite)", use_container_width=True, on_click=lambda: go_module("IU: Prostatite"))
+
+
+# ---------- UI — Cystite ----------
+def render_infectio_cystite_page():
+    btn_home_and_back(show_back=True, back_label="Infectiologie")
+    st.header("🔷 Cystite (hors grossesse) — triage simple / à risque / grave")
+
+    with st.form("cystite_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            age = st.number_input("Âge", min_value=12, max_value=100, value=28)
+            fievre_ge_38_5 = st.radio("Fièvre ≥ 38,5°C ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            lombalgies = st.radio("Douleur lombaire ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            douleurs_intenses = st.radio("Douleur intense ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            hematurie = st.radio("Hématurie ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            recidivante = st.radio("Cystites récidivantes ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with col2:
+            age_ge65_fragile = st.radio("≥65 ans fragile ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            anomalies_uro = st.radio("Anomalies uro/obstacle connu ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            immunodep = st.radio("Immunodépression ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            irc_significative = st.radio("IR chronique importante ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            sonde = st.radio("Sonde urinaire ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            diabete_non_controle = st.radio("Diabète non contrôlé ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with col3:
+            homme = st.radio("Sexe masculin ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            grossesse = st.radio("Grossesse ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            seps_sbp_lt90 = st.radio("TAS < 90 mmHg ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            seps_hr_gt120 = st.radio("FC > 120/min ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            confusion = st.radio("Confusion ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            vomissements = st.radio("Vomissements majeurs ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        submitted = st.form_submit_button("🔎 Générer la CAT — Cystite")
+
+    if submitted:
+        plan = plan_cystite(
+            age, fievre_ge_38_5, lombalgies, douleurs_intenses, hematurie, recidivante,
+            homme, grossesse, age_ge65_fragile, anomalies_uro, immunodep, irc_significative,
+            sonde, diabete_non_controle, seps_sbp_lt90, seps_hr_gt120, confusion, vomissements
+        )
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+        st.markdown("### 💊 Options probabilistes / conduite")
+        for x in plan["traitement"]: st.markdown("- " + x)
+        st.markdown("### 📅 Conduite et suivi")
+        for x in plan["suivi"]: st.markdown("- " + x)
+        if plan["notes"]:
+            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT — Cystite", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Cystite")
+
+
+# ---------- UI — PNA ----------
+def render_infectio_pna_page():
+    btn_home_and_back(show_back=True, back_label="Infectiologie")
+    st.header("🔷 Pyélonéphrite aiguë (PNA) — triage simple / à risque / grave")
+
+    with st.form("pna_form"):
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            fievre_ge_38_5 = st.radio("Fièvre ≥ 38,5°C ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            douleur_lombaire = st.radio("Douleur lombaire ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            vomissements = st.radio("Vomissements majeurs ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            homme = st.radio("Sexe masculin ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            grossesse = st.radio("Grossesse ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with col2:
+            age_ge65_fragile = st.radio("≥65 ans fragile ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            anomalies_uro = st.radio("Anomalies uro/obstacle ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            immunodep = st.radio("Immunodépression ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            irc_significative = st.radio("IR chronique importante ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            sonde = st.radio("Sonde urinaire ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            diabete_non_controle = st.radio("Diabète non contrôlé ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with col3:
+            seps_sbp_lt90 = st.radio("TAS < 90 mmHg ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            seps_hr_gt120 = st.radio("FC > 120/min ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            confusion = st.radio("Confusion ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        submitted = st.form_submit_button("🔎 Générer la CAT — PNA")
+
+    if submitted:
+        plan = plan_pna(
+            fievre_ge_38_5, douleur_lombaire, vomissements, homme, grossesse, age_ge65_fragile,
+            anomalies_uro, immunodep, irc_significative, sonde, diabete_non_controle,
+            seps_sbp_lt90, seps_hr_gt120, confusion
+        )
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+        st.markdown("### 💊 Options probabilistes / conduite")
+        for x in plan["traitement"]: st.markdown("- " + x)
+        st.markdown("### 📅 Conduite et suivi")
+        for x in plan["suivi"]: st.markdown("- " + x)
+        if plan["notes"]:
+            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT — PNA", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_PNA")
+
+
+# ---------- UI — Grossesse ----------
+def render_infectio_grossesse_page():
+    btn_home_and_back(show_back=True, back_label="Infectiologie")
+    st.header("🔷 Infection urinaire au cours de la grossesse")
+
+    with st.form("iu_grossesse_form"):
+        type_tableau = st.selectbox("Tableau clinique", ["Bactériurie asymptomatique", "Cystite", "PNA"])
+        terme_9e_mois = st.radio("9e mois de grossesse ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        allergies_betalactamines = st.radio("Allergie bêta-lactamines ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        seps_sbp_lt90 = st.radio("TAS < 90 mmHg ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        seps_hr_gt120 = st.radio("FC > 120/min ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        vomissements = st.radio("Vomissements majeurs ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        submitted = st.form_submit_button("🔎 Générer la CAT — Grossesse")
+
+    if submitted:
+        plan = plan_grossesse(type_tableau, terme_9e_mois, allergies_betalactamines, seps_sbp_lt90, seps_hr_gt120, vomissements)
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Gravité", plan["classification"], "Élément", "Résultat")
+        st.markdown("### 💊 Options probabilistes / conduite")
+        for x in plan["traitement"]: st.markdown("- " + x)
+        st.markdown("### 📅 Conduite et suivi")
+        for x in plan["suivi"]: st.markdown("- " + x)
+        if plan["notes"]:
+            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Gravité":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT — IU Grossesse", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_IU_Grossesse")
+
+
+# ---------- UI — Prostatite ----------
+def render_infectio_homme_page():
+    btn_home_and_back(show_back=True, back_label="Infectiologie")
+    st.header("🔷 Infection masculine — Prostatite aiguë")
+
+    with st.form("iu_homme_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            fievre_ge_38_5 = st.radio("Fièvre ≥ 38,5°C ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            douleurs_perineales = st.radio("Douleurs périnéales ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            dysurie = st.radio("Dysurie ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            retention = st.radio("Rétention aiguë ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            post_biopsie_prostate = st.radio("Post-biopsie prostatique récente ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with col2:
+            immunodep = st.radio("Immunodépression ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            irc_significative = st.radio("IR chronique importante ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            seps_sbp_lt90 = st.radio("TAS < 90 mmHg ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            seps_hr_gt120 = st.radio("FC > 120/min ?", ["Non", "Oui"], horizontal=True) == "Oui"
+            confusion = st.radio("Confusion ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        submitted = st.form_submit_button("🔎 Générer la CAT — Prostatite")
+
+    if submitted:
+        plan = plan_prostatite(
+            fievre_ge_38_5, douleurs_perineales, dysurie, retention, post_biopsie_prostate,
+            immunodep, irc_significative, seps_sbp_lt90, seps_hr_gt120, confusion
+        )
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+        st.markdown("### 💊 Options probabilistes / conduite")
+        for x in plan["traitement"]: st.markdown("- " + x)
+        st.markdown("### 📅 Conduite et suivi")
+        for x in plan["suivi"]: st.markdown("- " + x)
+        if plan["notes"]:
+            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
+        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
+        report_text = build_report_text("CAT — Prostatite aiguë", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Prostatite")
 
 # -------------------------
 # HBP (UI)
@@ -1590,6 +2087,16 @@ elif page == "TVES: Localisé":
     render_tves_local_page()
 elif page == "TVES: Métastatique":
     render_tves_meta_page()
+elif page == "Infectiologie":
+    render_infectio_menu()
+elif page == "IU: Grossesse":
+    render_infectio_grossesse_page()
+elif page == "IU: Cystite":
+    render_infectio_cystite_page()
+elif page == "IU: PNA":
+    render_infectio_pna_page()
+elif page == "IU: Prostatite":
+    render_infectio_homme_page()    
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
     render_hbp_page()
 else:
