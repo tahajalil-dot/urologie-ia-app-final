@@ -981,6 +981,75 @@ def plan_tves_metastatique(
         ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
         ("Éligible Carboplatine", "Oui" if carbo_eligible else "Non"),
         ("Naïf de platine (1re ligne)", "Oui" if platinum_naif else "Non"),
+        ("Altérations FGFR2/3", "Oui" if fgfr_alt else "Non"),
+        ("Platines déjà reçus", "Oui" if prior_platinum else "Non"),
+        ("Immunothérapie déjà reçue", "Oui" if prior_io else "Non"),
+        ("Choix 1L Cis-Gem-Nivo", "Oui" if use_cis_gem_nivo else "Non"),
+    ]
+
+    options = []
+    idx = 1
+    notes = []
+
+    # Cas où le patient n'est pas naïf de platine (par ex. rechute post-chimio antérieure)
+    if not platinum_naif:
+        if not prior_io:
+            options.append(f"Option {idx} : Pembrolizumab (si IO non reçue)."); idx += 1
+        options.append(f"Option {idx} : Enfortumab védotin (EV)."); idx += 1
+        if fgfr_alt:
+            options.append(f"Option {idx} : Erdafitinib (si altération FGFR2/3)."); idx += 1
+        notes.append("Séquence ultérieure selon réponses et tolérance; envisager essais cliniques.")
+    else:
+        # Vrai 1re ligne
+        if ev_pembro_eligible:
+            # 1L préférentielle
+            options.append(f"Option {idx} : 1L — Enfortumab védotin + Pembrolizumab (préférentiel)."); idx += 1
+            # 2L / 3L selon progression
+            options.append(f"Option {idx} : 2L — Platine + Gemcitabine (cis si éligible, sinon carbo)."); idx += 1
+            if fgfr_alt:
+                options.append(f"Option {idx} : 2L/3L — Erdafitinib (si FGFR2/3 altéré)."); idx += 1
+            options.append(f"Option {idx} : 3L — EV (si stratégie monothérapie envisageable) ou autre séquence selon tolérance."); idx += 1
+
+        else:
+            # Non éligible EV+Pembro → deux branches possibles
+            if use_cis_gem_nivo and cis_eligible:
+                # Triplet CheckMate-901
+                options.append(f"Option {idx} : 1L — Cisplatine + Gemcitabine + Nivolumab."); idx += 1
+                options.append(f"Option {idx} : 2L — Enfortumab védotin (EV)."); idx += 1
+                if fgfr_alt:
+                    options.append(f"Option {idx} : Ligne dédiée — Erdafitinib (si FGFR2/3 altéré)."); idx += 1
+            else:
+                # 1L platine-gem conventionnelle avec maintenance avelumab si contrôle
+                if cis_eligible:
+                    options.append(f"Option {idx} : 1L — Gemcitabine + Cisplatine."); idx += 1
+                elif carbo_eligible:
+                    options.append(f"Option {idx} : 1L — Gemcitabine + Carboplatine."); idx += 1
+                else:
+                    options.append(f"Option {idx} : 1L — (si aucun platine) discuter alternatives/essai clinique."); idx += 1
+
+                options.append(f"Option {idx} : Contrôle après 4–6 cycles — TDM TAP."); idx += 1
+                options.append(f"Option {idx} : Maintenance — Avelumab si maladie contrôlée (RC/PR/SD) après 4–6 cycles."); idx += 1
+                options.append(f"Option {idx} : 2L — Pembrolizumab en cas de progression sous/à l’issue de chimio."); idx += 1
+                options.append(f"Option {idx} : 2L/3L — Enfortumab védotin (EV) en cas de progression après IO."); idx += 1
+                if fgfr_alt:
+                    options.append(f"Option {idx} : Ligne dédiée — Erdafitinib (si FGFR2/3 altéré)."); idx += 1
+
+    # Suivi détaillé (communs aux schémas)
+    suivi = [
+        "Évaluation d’efficacité: TDM TAP toutes 8–12 semaines (au démarrage), puis adapter selon réponse/clinique.",
+        "Si 1L platine-gem: TDM TAP après 4–6 cycles pour décider maintenance Avelumab ou bascule 2L.",
+        "Biologie récurrente: NFS, créat/DFG, bilan hépatique; glycémie (EV), phosphatémie et bilan ophtalmo (FGFRi), TSH ± enzymes pancréatiques (IO).",
+        "Toxicités à surveiller: EV (éruption cutanée, neuropathie, hyperglycémie); IO (dermatites, colite, pneumonite, endocrinopathies); FGFRi (hyperphosphatémie, toxicité oculaire).",
+        "Soins de support: prise en charge douleur, diététique, activité adaptée; évaluation gériatrique si besoin.",
+    ]
+
+    return {
+        "donnees": donnees,
+        "traitement": options,
+        "suivi": suivi,
+        "notes": notes,
+    }
+
 
 # =========================
 # PAGES (UI)
@@ -1191,7 +1260,6 @@ def render_tves_local_page():
         report_text = build_report_text("CAT TVES localisé", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Localise")
 
-
 def render_tves_meta_page():
     btn_home_and_back(show_back=True, back_label="Tumeurs des voies excrétrices")
     st.header("🔷 TVES — métastatique (algorithme EV+Pembro / Platine-Gem / Cis-Gem-Nivo)")
@@ -1248,6 +1316,7 @@ def render_tves_meta_page():
         }
         report_text = build_report_text("CAT TVES métastatique (algorithme actualisé)", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Metastatique")
+
 
 
 # -------------------------
