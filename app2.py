@@ -1473,21 +1473,46 @@ def render_tvim_page():
         neo_adjuvant_fait = st.radio("Néoadjuvant déjà réalisé ?", ["Non", "Oui"], horizontal=True) == "Oui"
         submitted = st.form_submit_button("🔎 Générer la CAT – TVIM")
     if submitted:
-        plan = plan_tvim(t_cat, cN_pos, metastases, cis_eligible, t2_localise, hydron, bonne_fct_v, cis_diffus, pdl1_pos, post_op_high_risk, neo_adjuvant_fait)
+        plan = plan_tvim(
+            t_cat, cN_pos, metastases, cis_eligible, t2_localise, hydron,
+            bonne_fct_v, cis_diffus, pdl1_pos, post_op_high_risk, neo_adjuvant_fait
+        )
         donnees_pairs = [
             ("T", t_cat), ("cN+", "Oui" if cN_pos else "Non"), ("Métastases", "Oui" if metastases else "Non"),
-            ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"), ("T2 localisée (TMT possible)", "Oui" if t2_localise else "Non"),
-            ("Hydronéphrose", "Oui" if hydron else "Non"), ("Bonne fonction vésicale", "Oui" if bonne_fct_v else "Non"),
-            ("CIS diffus", "Oui" if cis_diffus else "Non"), ("PD-L1 positif", "Oui" if pdl1_pos else "Non"),
-            ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"), ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
+            ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
+            ("T2 localisée (TMT possible)", "Oui" if t2_localise else "Non"),
+            ("Hydronéphrose", "Oui" if hydron else "Non"),
+            ("Bonne fonction vésicale", "Oui" if bonne_fct_v else "Non"),
+            ("CIS diffus", "Oui" if cis_diffus else "Non"),
+            ("PD-L1 positif", "Oui" if pdl1_pos else "Non"),
+            ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"),
+            ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
         ]
         render_kv_table("🧾 Données saisies", donnees_pairs)
-        st.markdown("### 💊 Traitement recommandé");  [st.markdown("- " + x) for x in plan["traitement"]]
-        st.markdown("### 📅 Modalités de suivi");      [st.markdown("- " + x) for x in plan["surveillance"]]
+
+        st.markdown("### 💊 Traitement recommandé")
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["surveillance"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes");              [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in donnees_pairs],"Traitement recommandé":plan["traitement"],"Modalités de suivi":plan["surveillance"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT TVIM", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVIM")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in donnees_pairs],
+            "Traitement recommandé": plan["traitement"],
+            "Modalités de suivi": plan["surveillance"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT TVIM", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_TVIM")
+
 
 
 def render_vessie_meta_page():
@@ -1515,12 +1540,30 @@ def render_vessie_meta_page():
             ("Métastases osseuses", "Oui" if bone_mets else "Non"),
         ]
         render_kv_table("🧾 Données saisies", donnees_pairs)
-        st.markdown("### 💊 Traitement recommandé"); [st.markdown("- " + x) for x in plan["traitement"]]
-        st.markdown("### 📅 Modalités de suivi");     [st.markdown("- " + x) for x in plan["suivi"]]
+
+        st.markdown("### 💊 Traitement recommandé")
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes");             [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in donnees_pairs],"Traitement recommandé":plan["traitement"],"Modalités de suivi":plan["suivi"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT Vessie Métastatique", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Vessie_Metastatique")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in donnees_pairs],
+            "Traitement recommandé": plan["traitement"],
+            "Modalités de suivi": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT Vessie Métastatique", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_Vessie_Metastatique")
+
 
 def render_tves_menu():
     btn_home_and_back()
@@ -1695,14 +1738,31 @@ def render_infectio_cystite_page():
         )
         render_kv_table("🧾 Données saisies", plan["donnees"])
         render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+
         st.markdown("### 💊 Options probabilistes / conduite")
-        for x in plan["traitement"]: st.markdown("- " + x)
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
         st.markdown("### 📅 Conduite et suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT — Cystite", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Cystite")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in plan["donnees"]],
+            "Stratification":[f"{k}: {v}" for k,v in plan["classification"]],
+            "Traitement": plan["traitement"],
+            "Conduite/Follow-up": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT — Cystite", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_Cystite")
+
 
 
 # ---------- UI — PNA ----------
@@ -1740,14 +1800,31 @@ def render_infectio_pna_page():
         )
         render_kv_table("🧾 Données saisies", plan["donnees"])
         render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+
         st.markdown("### 💊 Options probabilistes / conduite")
-        for x in plan["traitement"]: st.markdown("- " + x)
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
         st.markdown("### 📅 Conduite et suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT — PNA", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_PNA")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in plan["donnees"]],
+            "Stratification":[f"{k}: {v}" for k,v in plan["classification"]],
+            "Traitement": plan["traitement"],
+            "Conduite/Follow-up": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT — PNA", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_PNA")
+
 
 
 # ---------- UI — Grossesse ----------
@@ -1765,17 +1842,36 @@ def render_infectio_grossesse_page():
         submitted = st.form_submit_button("🔎 Générer la CAT — Grossesse")
 
     if submitted:
-        plan = plan_grossesse(type_tableau, terme_9e_mois, allergies_betalactamines, seps_sbp_lt90, seps_hr_gt120, vomissements)
+        plan = plan_grossesse(
+            type_tableau, terme_9e_mois, allergies_betalactamines,
+            seps_sbp_lt90, seps_hr_gt120, vomissements
+        )
         render_kv_table("🧾 Données saisies", plan["donnees"])
         render_kv_table("📊 Gravité", plan["classification"], "Élément", "Résultat")
+
         st.markdown("### 💊 Options probabilistes / conduite")
-        for x in plan["traitement"]: st.markdown("- " + x)
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
         st.markdown("### 📅 Conduite et suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Gravité":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT — IU Grossesse", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_IU_Grossesse")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in plan["donnees"]],
+            "Gravité":[f"{k}: {v}" for k,v in plan["classification"]],
+            "Traitement": plan["traitement"],
+            "Conduite/Follow-up": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT — IU Grossesse", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_IU_Grossesse")
 
 
 # ---------- UI — Prostatite ----------
@@ -1807,14 +1903,31 @@ def render_infectio_homme_page():
         )
         render_kv_table("🧾 Données saisies", plan["donnees"])
         render_kv_table("📊 Stratification", plan["classification"], "Élément", "Résultat")
+
         st.markdown("### 💊 Options probabilistes / conduite")
-        for x in plan["traitement"]: st.markdown("- " + x)
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
         st.markdown("### 📅 Conduite et suivi")
-        for x in plan["suivi"]: st.markdown("- " + x)
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
         if plan["notes"]:
-            st.markdown("### 📝 Notes"); [st.markdown("- " + x) for x in plan["notes"]]
-        sections = {"Données":[f"{k}: {v}" for k,v in plan["donnees"]],"Stratification":[f"{k}: {v}" for k,v in plan["classification"]],"Traitement":plan["traitement"],"Conduite/Follow-up":plan["suivi"],"Notes":plan["notes"]}
-        report_text = build_report_text("CAT — Prostatite aiguë", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Prostatite")
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données":[f"{k}: {v}" for k,v in plan["donnees"]],
+            "Stratification":[f"{k}: {v}" for k,v in plan["classification"]],
+            "Traitement": plan["traitement"],
+            "Conduite/Follow-up": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT — Prostatite aiguë", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_Prostatite")
+
 
 # -------------------------
 # HBP (UI)
