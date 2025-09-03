@@ -811,6 +811,202 @@ def plan_meta(cis_eligible: bool, carbo_eligible: bool, platinum_naive: bool, pd
 
     return {"traitement": traitement, "suivi": suivi, "notes": notes}
 
+# =========================
+# LOGIQUE CLINIQUE — TVES (localisé & métastatique)
+# =========================
+
+def stratifier_tves_risque(
+    grade_biopsie: str,          # "Bas grade", "Haut grade", "Indéterminé"
+    cytologie_hg_positive: bool,
+    taille_cm: float,
+    multifocal: bool,
+    invasion_imagerie: bool,
+    hydron: bool,
+    kss_faisable: bool,          # possibilité de traitement conservateur endoscopique/segmentaire complet
+    accepte_suivi_strict: bool,
+):
+    """
+    Règles (synthèse) :
+      BAS RISQUE si TOUT est réuni :
+        - Bas grade à la biopsie URSS
+        - Cytologie haut grade négative
+        - Lésion non infiltrante à l’imagerie (pas d’invasion) et PAS d’hydronéphrose
+        - Taille < 2 cm
+        - Unifocale (multifocal = False)
+        - Traitement conservateur réalisable (kss_faisable = True)
+        - Patient accepte le suivi strict (accepte_suivi_strict = True)
+      Sinon = HAUT RISQUE
+    """
+    conditions_bas = [
+        grade_biopsie == "Bas grade",
+        not cytologie_hg_positive,
+        not invasion_imagerie,
+        not hydron,
+        taille_cm < 2.0,
+        not multifocal,
+        kss_faisable,
+        accepte_suivi_strict,
+    ]
+    return "Bas risque" if all(conditions_bas) else "Haut risque"
+
+
+def _suivi_tves_apres_nut():
+    return [
+        "Cystoscopie + cytologie : tous les 3 mois pendant 1 an, puis tous les 6 mois pendant 2 ans, puis annuelle (durée prolongée > 5–10 ans).",
+        "Imagerie (uro-TDM ± TDM thorax) : tous les 6 mois pendant 4 ans, puis annuelle.",
+        "Biologie : créat/DFG à chaque visite; adapter si rein unique/CKD.",
+    ]
+
+
+def _suivi_tves_apres_kss():
+    return [
+        "URSS (± biopsies) + cytologie *in situ* : à 6–8 semaines (second look), puis à 3 et 6 mois, ensuite annuelle si stable.",
+        "Cystoscopie : à 3 et 6 mois, puis annuelle.",
+        "Imagerie (uro-TDM) : à 3 et 6 mois, puis annuelle.",
+        "Biologie : créat/DFG, selon contexte.",
+    ]
+
+
+def plan_tves_localise(
+    grade_biopsie: str,
+    cytologie_hg_positive: bool,
+    taille_cm: float,
+    multifocal: bool,
+    invasion_imagerie: bool,
+    hydron: bool,
+    kss_faisable: bool,
+    accepte_suivi_strict: bool,
+    localisation: str,  # "Bassinets/caliciel", "Uretère proximal", "Uretère moyen", "Uretère distal"
+):
+    """
+    Renvoie dict {donnees, stratification, traitement, suivi, notes}
+    - Options numérotées si plusieurs possibilités ; sinon conduite directe.
+    """
+    risque = stratifier_tves_risque(
+        grade_biopsie, cytologie_hg_positive, taille_cm, multifocal,
+        invasion_imagerie, hydron, kss_faisable, accepte_suivi_strict
+    )
+
+    donnees = [
+        ("Risque estimé", risque),
+        ("Grade biopsie URSS", grade_biopsie),
+        ("Cytologie haut grade positive", "Oui" if cytologie_hg_positive else "Non"),
+        ("Taille lésion", f"{taille_cm:.1f} cm"),
+        ("Multifocale", "Oui" if multifocal else "Non"),
+        ("Invasion suspecte à l’imagerie", "Oui" if invasion_imagerie else "Non"),
+        ("Hydronéphrose", "Oui" if hydron else "Non"),
+        ("KSS (conservateur) faisable", "Oui" if kss_faisable else "Non"),
+        ("Acceptation suivi strict", "Oui" if accepte_suivi_strict else "Non"),
+        ("Localisation", localisation),
+    ]
+
+    options = []
+    notes = []
+    suivi = []
+    idx = 1
+
+    if risque == "Bas risque":
+        # KSS prioritaire
+        options.append(f"Option {idx} : traitement conservateur endoscopique (URSS laser/ablation) avec second look à 6–8 semaines."); idx += 1
+        if "Uretère distal" in localisation:
+            options.append(f"Option {idx} : chirurgie conservatrice — Urétérectomie segmentaire + réimplantation (sélectionné)."); idx += 1
+
+        # Si KSS impossible malgré critères bas risque → NUT
+        options.append(f"Option {idx} : Néphro-urétérectomie totale (NUT) si KSS non réalisable/échec."); idx += 1
+
+        # Adjuvants/préventions
+        notes += [
+            "Après NUT : instillation intravésicale unique (ex. mitomycine) 2–10 jours post-op pour ↓ récidives vésicales.",
+            "Topiques réno-urétéraux (ex. MMC/gel) après KSS selon centres/disponibilité.",
+        ]
+
+        suivi = _suivi_tves_apres_kss()
+
+    else:  # Haut risque
+        options.append(f"Option {idx} : Néphro-urétérectomie totale (NUT) avec collerette vésicale en bloc ± curage selon topographie."); idx += 1
+        # (Néoadjuvant possible selon centre; souvent adjuvant privilégié POUT)
+        notes.append("Adjuvant : chimiothérapie sels de platine (schéma basé cisplatine si DFG suffisant) à discuter pour pT2–T4 et/ou pN+ (type POUT).")
+        notes.append("Après NUT : instillation intravésicale unique (ex. mitomycine) 2–10 jours post-op pour ↓ récidive vésicale.")
+        suivi = _suivi_tves_apres_nut()
+
+    # Conduite directe si une seule option
+    if len(options) == 1:
+        traitement = options  # 1 seule ligne (conduite)
+    else:
+        traitement = options  # plusieurs "Option x"
+
+    return {
+        "donnees": donnees,
+        "stratification": [("Risque", risque)],
+        "traitement": traitement,
+        "suivi": suivi,
+        "notes": notes,
+    }
+
+
+def plan_tves_metastatique(
+    cis_eligible: bool,
+    carbo_eligible: bool,
+    platinum_naif: bool,
+    fgfr_alt: bool,
+    prior_platinum: bool,
+    prior_io: bool,
+):
+    """
+    Basé sur l'algorithme de prise en charge de la figure-type :
+      - 1re ligne : cis-gem si éligible, sinon carbo-gem ; maintenance avélumab si RC/PR/SD.
+      - Alternatives/combinaisons récentes (ADC + IO) selon accès.
+      - 2e ligne : pembrolizumab si non administré en maintenance ; ciblage FGFR (erdafitinib) si altérations FGFR2/3.
+      - Lignes ultérieures : enfortumab védotin, sacituzumab govitecan (selon disponibilité), essais cliniques.
+    """
+    donnees = [
+        ("Éligible cisplatine", "Oui" if cis_eligible else "Non"),
+        ("Éligible carboplatine", "Oui" if carbo_eligible else "Non"),
+        ("Naïf de platine (1re ligne)", "Oui" if platinum_naif else "Non"),
+        ("Altérations FGFR2/3", "Oui" if fgfr_alt else "Non"),
+        ("Platines reçus auparavant", "Oui" if prior_platinum else "Non"),
+        ("IO (PD-1/PD-L1) déjà reçue", "Oui" if prior_io else "Non"),
+    ]
+
+    options = []
+    idx = 1
+    notes = []
+
+    # 1re ligne
+    if platinum_naif:
+        if cis_eligible:
+            options.append(f"Option {idx} : 1re ligne — Gemcitabine + Cisplatine → **maintenance avélumab** si RC/PR/SD."); idx += 1
+        elif carbo_eligible:
+            options.append(f"Option {idx} : 1re ligne — Gemcitabine + Carboplatine → **maintenance avélumab** si RC/PR/SD."); idx += 1
+        else:
+            options.append(f"Option {idx} : 1re ligne — Combinaisons anticorps-conjugué + IO (selon accès centre/pays)."); idx += 1
+
+    # 2e ligne (après chimio)
+    if prior_platinum and not prior_io:
+        options.append(f"Option {idx} : 2e ligne — Pembrolizumab."); idx += 1
+
+    # Ciblage FGFR
+    if fgfr_alt:
+        options.append(f"Option {idx} : ligne dédiée — Erdafitinib (si altérations FGFR2/3)."); idx += 1
+
+    # Lignes ultérieures / alternatives
+    options.append(f"Option {idx} : ultérieur — Enfortumab védotin (± Pembrolizumab selon stratégie antérieure)."); idx += 1
+    options.append(f"Option {idx} : ultérieur — Sacituzumab govitecan (selon disponibilité)."); idx += 1
+    options.append(f"Option {idx} : stratégie — Essai clinique si disponible."); idx += 1
+
+    # Suivi (détaillé)
+    suivi = [
+        "Avant et pendant traitement : NFS, créat/DFG, bilan hépatique; phosphatémie/œil (si FGFRi), TA/protéinurie (si ADC/IO selon profil).",
+        "Imagerie de réévaluation : TDM TAP toutes 8–12 semaines au début, puis espacement selon réponse/clinique.",
+        "Surveillance toxicités : cutané/neuropathies (ADC), immuno (dermato, colite, pneumonite) sous IO; électrolytes, œil sous FGFRi.",
+    ]
+
+    return {
+        "donnees": donnees,
+        "traitement": options,
+        "suivi": suivi,
+        "notes": notes,
+    }
 
 # =========================
 # PAGES (UI)
@@ -958,6 +1154,106 @@ def render_vessie_meta_page():
         sections = {"Données":[f"{k}: {v}" for k,v in donnees_pairs],"Traitement recommandé":plan["traitement"],"Modalités de suivi":plan["suivi"],"Notes":plan["notes"]}
         report_text = build_report_text("CAT Vessie Métastatique", sections); st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Vessie_Metastatique")
 
+def render_tves_menu():
+    btn_home_and_back()
+    st.markdown("## Tumeurs des voies excrétrices")
+    st.caption("Choisissez le sous-module")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.button("Localisé (non métastatique)", use_container_width=True, on_click=lambda: go_module("TVES: Localisé"))
+    with c2:
+        st.button("Métastatique", use_container_width=True, on_click=lambda: go_module("TVES: Métastatique"))
+
+
+def render_tves_local_page():
+    btn_home_and_back(show_back=True, back_label="Tumeurs des voies excrétrices")
+    st.header("🔷 TVES — localisé (UTUC non métastatique)")
+    with st.form("tves_local_form"):
+        grade_biopsie = st.selectbox("Grade biopsie URSS", ["Bas grade", "Haut grade", "Indéterminé"])
+        cytologie_hg_positive = st.radio("Cytologie haut grade positive ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        taille_cm = st.number_input("Taille lésion (cm)", min_value=0.2, max_value=10.0, value=1.5, step=0.1)
+        multifocal = st.radio("Multifocale ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        invasion_imagerie = st.radio("Invasion suspecte à l’imagerie (uro-TDM/IRM) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        hydron = st.radio("Hydronéphrose ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        kss_faisable = st.radio("Traitement conservateur complet réalisable ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        accepte_suivi_strict = st.radio("Patient accepte le suivi strict endoscopique/imagerie ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        localisation = st.selectbox("Localisation", ["Bassinets/caliciel", "Uretère proximal", "Uretère moyen", "Uretère distal"])
+        submitted = st.form_submit_button("🔎 Générer la CAT – TVES localisé")
+
+    if submitted:
+        plan = plan_tves_localise(
+            grade_biopsie, cytologie_hg_positive, taille_cm, multifocal,
+            invasion_imagerie, hydron, kss_faisable, accepte_suivi_strict,
+            localisation
+        )
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Stratification", plan["stratification"], "Élément", "Résultat")
+
+        if len(plan["traitement"]) == 1:
+            st.markdown("### 🧭 Conduite recommandée")
+            for x in plan["traitement"]:
+                st.markdown("- " + x)
+        else:
+            st.markdown("### 💊 Traitement — Options numérotées")
+            for x in plan["traitement"]:
+                st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
+            "Stratification": [f"{k}: {v}" for k, v in plan["stratification"]],
+            "Traitement": plan["traitement"],
+            "Modalités de suivi": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT TVES localisé", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Localise")
+
+
+def render_tves_meta_page():
+    btn_home_and_back(show_back=True, back_label="Tumeurs des voies excrétrices")
+    st.header("🔷 TVES — métastatique")
+    with st.form("tves_meta_form"):
+        cis_eligible = st.radio("Éligible Cisplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        carbo_eligible = st.radio("Éligible Carboplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        platinum_naif = st.radio("Naïf de platine (1re ligne) ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        fgfr_alt = st.radio("Altérations FGFR2/3 connues ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        prior_platinum = st.radio("A déjà reçu chimio à base de platine ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        prior_io = st.radio("A déjà reçu une immunothérapie (PD-1/PD-L1) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        submitted = st.form_submit_button("🔎 Générer la CAT – TVES métastatique")
+
+    if submitted:
+        plan = plan_tves_metastatique(cis_eligible, carbo_eligible, platinum_naif, fgfr_alt, prior_platinum, prior_io)
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        st.markdown("### 💊 Traitement — Options numérotées")
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
+            "Traitement (options)": plan["traitement"],
+            "Modalités de suivi": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT TVES métastatique", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Metastatique")
 
 # -------------------------
 # HBP (UI)
@@ -1224,6 +1520,12 @@ elif page == "Rein: Métastatique":
     render_kidney_meta_page()
 elif page == "Rein: Biopsie":
     render_kidney_biopsy_page()
+elif page == "Tumeurs des voies excrétrices":
+    render_tves_menu()
+elif page == "TVES: Localisé":
+    render_tves_local_page()
+elif page == "TVES: Métastatique":
+    render_tves_meta_page()
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
     render_hbp_page()
 else:
