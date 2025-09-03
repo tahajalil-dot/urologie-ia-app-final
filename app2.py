@@ -945,68 +945,42 @@ def plan_tves_localise(
 
 
 def plan_tves_metastatique(
+    ev_pembro_eligible: bool,
     cis_eligible: bool,
     carbo_eligible: bool,
     platinum_naif: bool,
     fgfr_alt: bool,
     prior_platinum: bool,
     prior_io: bool,
+    use_cis_gem_nivo: bool,   # ← nouveau paramètre (pour le bras "Cisplatine Gem Nivo")
 ):
     """
-    Basé sur l'algorithme de prise en charge de la figure-type :
-      - 1re ligne : cis-gem si éligible, sinon carbo-gem ; maintenance avélumab si RC/PR/SD.
-      - Alternatives/combinaisons récentes (ADC + IO) selon accès.
-      - 2e ligne : pembrolizumab si non administré en maintenance ; ciblage FGFR (erdafitinib) si altérations FGFR2/3.
-      - Lignes ultérieures : enfortumab védotin, sacituzumab govitecan (selon disponibilité), essais cliniques.
+    Aligne la CAT sur l’algorithme fourni pour carcinome urothélial métastatique:
+
+    - Si éligible EV + Pembro → 1L = EV + Pembrolizumab (option préférentielle)
+        • Progression → 2L: Platine-Gemcitabine (cis/carbo selon éligibilité)
+        • (FGFR alt) → Erdafitinib possible (2L/3L)
+        • Progression ultérieure → 3L: EV (si non déjà exploitable en monothérapie) ± Erdafitinib si FGFR alt non utilisé
+
+    - Si NON éligible EV + Pembro:
+        • Option A (si cis éligible ET choisi): 1L = Cisplatine + Gemcitabine + Nivolumab
+              ↳ Progression → EV  ± Erdafitinib (si FGFR alt)
+        • Option B (par défaut): 1L = Platine-Gemcitabine (cis si possible, sinon carbo)
+              ↳ TDM TAP après 4–6 cycles:
+                    - maladie contrôlée (RC/PR/SD) → maintenance Avelumab
+                    - progression → Pembrolizumab
+              ↳ Progression après maintenance/IO → EV  ± Erdafitinib (si FGFR alt)
+
+    - Si patient NON naïf de platine: orienter directement vers Pembro (si pas d’IO antérieure),
+      sinon EV / Erdafitinib selon FGFR.
+
+    Renvoie: dict {donnees, traitement (options numérotées), suivi (détaillé), notes}
     """
     donnees = [
-        ("Éligible cisplatine", "Oui" if cis_eligible else "Non"),
-        ("Éligible carboplatine", "Oui" if carbo_eligible else "Non"),
+        ("Éligible EV + Pembrolizumab", "Oui" if ev_pembro_eligible else "Non"),
+        ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
+        ("Éligible Carboplatine", "Oui" if carbo_eligible else "Non"),
         ("Naïf de platine (1re ligne)", "Oui" if platinum_naif else "Non"),
-        ("Altérations FGFR2/3", "Oui" if fgfr_alt else "Non"),
-        ("Platines reçus auparavant", "Oui" if prior_platinum else "Non"),
-        ("IO (PD-1/PD-L1) déjà reçue", "Oui" if prior_io else "Non"),
-    ]
-
-    options = []
-    idx = 1
-    notes = []
-
-    # 1re ligne
-    if platinum_naif:
-        if cis_eligible:
-            options.append(f"Option {idx} : 1re ligne — Gemcitabine + Cisplatine → **maintenance avélumab** si RC/PR/SD."); idx += 1
-        elif carbo_eligible:
-            options.append(f"Option {idx} : 1re ligne — Gemcitabine + Carboplatine → **maintenance avélumab** si RC/PR/SD."); idx += 1
-        else:
-            options.append(f"Option {idx} : 1re ligne — Combinaisons anticorps-conjugué + IO (selon accès centre/pays)."); idx += 1
-
-    # 2e ligne (après chimio)
-    if prior_platinum and not prior_io:
-        options.append(f"Option {idx} : 2e ligne — Pembrolizumab."); idx += 1
-
-    # Ciblage FGFR
-    if fgfr_alt:
-        options.append(f"Option {idx} : ligne dédiée — Erdafitinib (si altérations FGFR2/3)."); idx += 1
-
-    # Lignes ultérieures / alternatives
-    options.append(f"Option {idx} : ultérieur — Enfortumab védotin (± Pembrolizumab selon stratégie antérieure)."); idx += 1
-    options.append(f"Option {idx} : ultérieur — Sacituzumab govitecan (selon disponibilité)."); idx += 1
-    options.append(f"Option {idx} : stratégie — Essai clinique si disponible."); idx += 1
-
-    # Suivi (détaillé)
-    suivi = [
-        "Avant et pendant traitement : NFS, créat/DFG, bilan hépatique; phosphatémie/œil (si FGFRi), TA/protéinurie (si ADC/IO selon profil).",
-        "Imagerie de réévaluation : TDM TAP toutes 8–12 semaines au début, puis espacement selon réponse/clinique.",
-        "Surveillance toxicités : cutané/neuropathies (ADC), immuno (dermato, colite, pneumonite) sous IO; électrolytes, œil sous FGFRi.",
-    ]
-
-    return {
-        "donnees": donnees,
-        "traitement": options,
-        "suivi": suivi,
-        "notes": notes,
-    }
 
 # =========================
 # PAGES (UI)
@@ -1220,18 +1194,38 @@ def render_tves_local_page():
 
 def render_tves_meta_page():
     btn_home_and_back(show_back=True, back_label="Tumeurs des voies excrétrices")
-    st.header("🔷 TVES — métastatique")
+    st.header("🔷 TVES — métastatique (algorithme EV+Pembro / Platine-Gem / Cis-Gem-Nivo)")
+
     with st.form("tves_meta_form"):
-        cis_eligible = st.radio("Éligible Cisplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        carbo_eligible = st.radio("Éligible Carboplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        platinum_naif = st.radio("Naïf de platine (1re ligne) ?", ["Oui", "Non"], horizontal=True) == "Oui"
-        fgfr_alt = st.radio("Altérations FGFR2/3 connues ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        prior_platinum = st.radio("A déjà reçu chimio à base de platine ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        ev_pembro_eligible = st.radio("Éligible à EV + Pembrolizumab (1L préférentielle) ?", ["Oui", "Non"], horizontal=True) == "Oui"
+
+        if not ev_pembro_eligible:
+            st.markdown("#### Si EV+Pembro non éligible :")
+            cis_eligible = st.radio("Éligible Cisplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            carbo_eligible = st.radio("Éligible Carboplatine ?", ["Oui", "Non"], horizontal=True) == "Oui"
+            use_cis_gem_nivo = False
+            if cis_eligible:
+                use_cis_gem_nivo = st.radio("Choisir 1L **Cisplatine + Gemcitabine + Nivolumab** ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        else:
+            # Valeurs par défaut si EV+Pembro éligible
+            cis_eligible = False
+            carbo_eligible = False
+            use_cis_gem_nivo = False
+
+        st.markdown("#### Historique & biomarqueurs")
+        platinum_naif = st.radio("Naïf de platine (vraie 1re ligne) ?", ["Oui", "Non"], horizontal=True) == "Oui"
+        prior_platinum = st.radio("A déjà reçu une chimio à base de platine ?", ["Non", "Oui"], horizontal=True) == "Oui"
         prior_io = st.radio("A déjà reçu une immunothérapie (PD-1/PD-L1) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        fgfr_alt = st.radio("Altérations FGFR2/3 connues ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
         submitted = st.form_submit_button("🔎 Générer la CAT – TVES métastatique")
 
     if submitted:
-        plan = plan_tves_metastatique(cis_eligible, carbo_eligible, platinum_naif, fgfr_alt, prior_platinum, prior_io)
+        plan = plan_tves_metastatique(
+            ev_pembro_eligible, cis_eligible, carbo_eligible, platinum_naif,
+            fgfr_alt, prior_platinum, prior_io, use_cis_gem_nivo
+        )
+
         render_kv_table("🧾 Données saisies", plan["donnees"])
         st.markdown("### 💊 Traitement — Options numérotées")
         for x in plan["traitement"]:
@@ -1252,8 +1246,9 @@ def render_tves_meta_page():
             "Modalités de suivi": plan["suivi"],
             "Notes": plan["notes"],
         }
-        report_text = build_report_text("CAT TVES métastatique", sections)
+        report_text = build_report_text("CAT TVES métastatique (algorithme actualisé)", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_TVES_Metastatique")
+
 
 # -------------------------
 # HBP (UI)
