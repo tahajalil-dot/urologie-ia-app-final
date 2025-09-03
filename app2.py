@@ -1049,6 +1049,164 @@ def plan_tves_metastatique(
         "suivi": suivi,
         "notes": notes,
     }
+# =========================
+# LOGIQUE CLINIQUE — LITHIASE (CN, options selon taille/localisation)
+# =========================
+
+def classer_cn_severite(fievre: bool, hyperalgique: bool, oligoanurie: bool, doute_diag: bool) -> str:
+    """
+    Retourne 'compliquée' si au moins un critère de gravité, sinon 'simple'.
+    - Forme compliquée (exemples dans PDF) : fièvre/infection, hyperalgie incoercible, oligo-anurie/IR, doute diagnostique → imagerie urgente. 
+    """
+    if fievre or hyperalgique or oligoanurie or doute_diag:
+        return "compliquée"
+    return "simple"
+
+
+def choix_technique_selon_calcul(localisation: str, taille_mm: int, grossesse: bool, anticoag: bool):
+    """
+    Propose des options procédurales selon la localisation/taille du calcul.
+    NB : en cas de grossesse ou d'anticoagulants non corrigés → ESWL contre-indiquée (voir tableau des CI dans le PDF).
+    Retourne une liste d'options (strings) déjà préfixées 'Option i : ...'
+    """
+    options = []
+    i = 1
+
+    # Contre-indications procédurales de principe tirées du tableau : grossesse ; troubles de l’hémostase/anticoagulants non corrigés.
+    eswl_possible = (not grossesse) and (not anticoag)
+
+    # URETÈRE
+    if localisation.startswith("Uretère"):
+        if taille_mm < 10:
+            # ESWL privilégiée si <10 mm ; URS reste une alternative valable.
+            if eswl_possible:
+                options.append(f"Option {i} : traitement chirurgical — LEC/ESWL (uretère < 10 mm).")
+                i += 1
+            options.append(f"Option {i} : traitement chirurgical — Urétéroscopie (URS).")
+            i += 1
+        else:
+            # ≥10 mm : URS en première intention ; ESWL moins favorable (densité/position).
+            options.append(f"Option {i} : traitement chirurgical — Urétéroscopie (URS) (uretère ≥ 10 mm).")
+            i += 1
+            if eswl_possible:
+                options.append(f"Option {i} : traitement chirurgical — ESWL (au cas par cas selon densité/position).")
+                i += 1
+
+    # REIN (intra-rénal)
+    else:
+        if taille_mm < 20:
+            # <20 mm : ESWL ou URS
+            if eswl_possible:
+                options.append(f"Option {i} : traitement chirurgical — LEC/ESWL (calcul rénal < 20 mm).")
+                i += 1
+            options.append(f"Option {i} : traitement chirurgical — URS flexible (calcul rénal < 20 mm, notamment bas calice).")
+            i += 1
+        else:
+            # ≥20 mm : PCNL en 1re intention
+            options.append(f"Option {i} : traitement chirurgical — Néphrolithotomie percutanée (PCNL) (≥ 20 mm, coralliformes).")
+            i += 1
+
+    return options
+
+
+def plan_lithiase(
+    fievre: bool,
+    hyperalgique: bool,
+    oligoanurie: bool,
+    doute_diag: bool,
+    grossesse: bool,
+    anticoag: bool,
+    localisation: str,   # "Uretère distal/moyen/proximal" ou "Rein (intracavicitaire)"
+    taille_mm: int | None,  # peut être None si inconnue
+):
+    """
+    Retourne dict {donnees, traitement, suivi, notes}
+    Logique fondée sur le PDF lithiase (diagnostic/imagerie, évolution des calculs, CI procédurales, suivi).
+    """
+
+    severite = classer_cn_severite(fievre, hyperalgique, oligoanurie, doute_diag)
+
+    donnees = [
+        ("Forme", severite),
+        ("Fièvre/infection", "Oui" if fievre else "Non"),
+        ("Douleur hyperalgique", "Oui" if hyperalgique else "Non"),
+        ("Oligo-anurie / IR", "Oui" if oligoanurie else "Non"),
+        ("Doute diagnostique", "Oui" if doute_diag else "Non"),
+        ("Grossesse", "Oui" if grossesse else "Non"),
+        ("Anticoagulants/troubles hémostase non corrigés", "Oui" if anticoag else "Non"),
+        ("Localisation du calcul", localisation),
+        ("Taille estimée", f"{taille_mm} mm" if isinstance(taille_mm, (int, float)) else "Inconnue"),
+    ]
+
+    options = []
+    notes = []
+    i = 1
+
+    # 1) Urgences / imagerie
+    if severite == "compliquée":
+        # Imagerie en urgence
+        if grossesse:
+            options.append(f"Option {i} : imagerie — Échographie +/− ASP en première intention (grossesse)."); i += 1
+        else:
+            options.append(f"Option {i} : imagerie — TDM abdomino-pelvienne sans injection en URGENCE."); i += 1
+
+        # Drainage urgent si obstacle infecté/hyperalgie/anurie
+        options.append(f"Option {i} : drainage en urgence — sonde JJ ou néphrostomie percutanée si obstacle infecté/anurique/hyperalgique."); i += 1
+
+        # ATB si fièvre/infection (adaptation secondaire à l’ECBU)
+        if fievre:
+            options.append(f"Option {i} : antibiothérapie probabiliste puis adaptée à l’ECBU (infection associée)."); i += 1
+
+        # Antalgie
+        options.append(f"Option {i} : antalgie — AINS IV (ex. kétoprofène) ± palier II/III si besoin, antiémétiques."); i += 1
+
+        # CI procédurales en phase infectée/anticoagulée/grossesse (pour ESWL notamment)
+        if grossesse:
+            notes.append("Grossesse : ESWL contre-indiquée.")
+        if anticoag:
+            notes.append("Troubles hémostase/anticoagulants non corrigés : contre-indication procédurale (corriger avant geste).")
+
+        # Pas de choix de désobstruction définitive tant que l’infection n’est pas contrôlée.
+        notes.append("Traiter l’infection et lever l’obstacle en urgence ; le traitement lithiasique définitif sera différé.")
+
+    else:
+        # 2) Forme simple : stratégie selon taille/localisation (si taille connue)
+        #    + possibilité de surveillance courte si petit calcul
+        # Surveillance/conservateur si petit calcul urétéral et douleur contrôlée
+        if taille_mm is not None and taille_mm <= 4 and localisation.startswith("Uretère"):
+            options.append(f"Option {i} : abstention surveillée — antalgiques, hydratation, surveillance clinique/imagerie.")
+            i += 1
+
+        # Options procédurales selon taille/localisation
+        if taille_mm is not None:
+            options += choix_technique_selon_calcul(localisation, taille_mm, grossesse, anticoag)
+        else:
+            # Taille inconnue : proposer d’affiner par imagerie
+            if grossesse:
+                options.append(f"Option {i} : imagerie — Échographie +/− ASP pour estimer la taille et la position."); i += 1
+            else:
+                options.append(f"Option {i} : imagerie — TDM sans injection pour estimer taille/densité/localisation."); i += 1
+
+        # Antalgie systématique
+        options.append(f"Option {i} : antalgie — AINS ± morphiniques si besoin, antiémétiques."); i += 1
+
+        # Contre-indications procédurales
+        if grossesse:
+            notes.append("Grossesse : ESWL contre-indiquée.")
+        if anticoag:
+            notes.append("Troubles hémostase/anticoagulants non corrigés : éviter gestes à risque tant que non corrigés.")
+
+    # 3) Suivi (conservateur et post-traitement) — selon PDF
+    suivi = [
+        "Suivi imagerie (ASP/écho) toutes les 2 semaines en cas de prise en charge conservatrice.",
+        "Si le calcul persiste à 4–6 semaines : proposer un traitement spécifique (ESWL/URS/PCNL selon cas).",
+        "Contrôle 1–3 mois après tout traitement urologique pour évaluer le résultat.",
+        "Ensuite, suivi d’imagerie tous les 6–12 mois.",
+        "Bilan métabolique complet à distance du contexte aigu (≈1 mois), puis réévaluation à 6 mois après mesures hygiéno-diététiques.",
+        "Mesures hygiéno-diététiques (≥2 L/j, régime adapté selon type de lithiase si identifié).",
+    ]
+
+    return {"donnees": donnees, "traitement": options, "suivi": suivi, "notes": notes}
 
 # =========================
 # LOGIQUE CLINIQUE — INFECTIO (Grossesse, Cystite, PNA, Prostatite)
@@ -1928,6 +2086,75 @@ def render_infectio_homme_page():
         st.markdown("### 📤 Export")
         offer_exports(report_text, "CAT_Prostatite")
 
+# -------------------------
+# LITHIASE (UI)
+# -------------------------
+def render_lithiase_page():
+    btn_home_and_back()
+    st.header("🔷 Lithiase urinaire — Conduite à tenir")
+
+    with st.form("lithiase_form"):
+        st.markdown("#### Triage initial")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: fievre = st.radio("Fièvre / infection ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with c2: hyperalgique = st.radio("Douleur hyperalgique ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with c3: oligoanurie = st.radio("Oligo-anurie / IR ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with c4: doute_diag = st.radio("Doute diagnostique ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        st.markdown("#### Contexte")
+        c5, c6 = st.columns(2)
+        with c5: grossesse = st.radio("Grossesse ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        with c6: anticoag = st.radio("Anticoagulants / troubles hémostase non corrigés ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        st.markdown("#### Calcul (si connu)")
+        c7, c8 = st.columns(2)
+        with c7:
+            localisation = st.selectbox(
+                "Localisation",
+                ["Uretère distal", "Uretère moyen", "Uretère proximal", "Rein (intracavicitaire)"],
+                index=0
+            )
+        with c8:
+            taille_mm = st.number_input("Taille estimée (mm)", min_value=0, max_value=40, value=5, step=1)
+
+        submitted = st.form_submit_button("🔎 Générer la CAT – Lithiase")
+
+    if submitted:
+        plan = plan_lithiase(
+            fievre=fievre,
+            hyperalgique=hyperalgique,
+            oligoanurie=oligoanurie,
+            doute_diag=doute_diag,
+            grossesse=grossesse,
+            anticoag=anticoag,
+            localisation=localisation,
+            taille_mm=taille_mm if taille_mm > 0 else None
+        )
+
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        st.markdown("### 💊 Conduite à tenir (options classées)")
+        for x in plan["traitement"]:
+            st.markdown("- " + x)
+
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        # Export
+        sections = {
+            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
+            "Conduite à tenir": plan["traitement"],
+            "Suivi": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT Lithiase", sections)
+        st.markdown("### 📤 Export")
+        offer_exports(report_text, "CAT_Lithiase")
 
 # -------------------------
 # HBP (UI)
@@ -2209,7 +2436,9 @@ elif page == "IU: Cystite":
 elif page == "IU: PNA":
     render_infectio_pna_page()
 elif page == "IU: Prostatite":
-    render_infectio_homme_page()    
+    render_infectio_homme_page() 
+elif page == "Lithiase":
+    render_lithiase_page()
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
     render_hbp_page()
 else:
