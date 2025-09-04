@@ -382,6 +382,230 @@ def plan_hbp(
         notes.append("Préservation éjaculation : discuter risques éjaculatoires des alpha‑bloquants et des techniques chirurgicales.")
 
     return {"donnees": donnees, "traitement": options, "notes": notes}
+# =========================
+# LOGIQUE CLINIQUE — PROSTATE (Localisé / Récidive / Métastatique)
+# =========================
+
+# --- 1) Strate de risque (D'Amico adapté AFU) ---
+def prostate_risk_damico(psa: float, isup: int, cT: str) -> str:
+    """
+    Retourne 'faible', 'intermédiaire', 'élevé'.
+    D'Amico (adapté AFU localisé) : 
+      - FAIBLE   : T1–T2a ET PSA < 10 ET ISUP 1
+      - INTER    : PSA 10–20 OU ISUP 2–3 OU T2b–T2c (sans critère 'élevé')
+      - ÉLEVÉ    : PSA > 20 OU ISUP 4–5 OU ≥ T3
+    # IBJSR6-main.pdf — AFU localisé : les parties 'prise en charge de la maladie localisée' cadrent ces approches (ex. F418 L31-L35 pour PT comme traitement de référence).
+    """
+    t_high = cT.startswith("T3") or cT.startswith("T4")
+    t_inter = cT in ["T2b", "T2c"]
+    if (psa > 20) or (isup >= 4) or t_high:
+        return "élevé"
+    if (10 <= psa <= 20) or (isup in [2, 3]) or t_inter:
+        return "intermédiaire"
+    if (psa < 10) and (isup == 1) and (cT in ["T1", "T2a"]):
+        return "faible"
+    # Par défaut, classer intermédiaire si ambigu
+    return "intermédiaire"
+
+
+# --- 2) CAT — Prostate localisée (options + degré) ---
+def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: int):
+    """
+    Retourne dict {donnees, risque, options, notes}
+    Chaque option = {label, degre ('fort'/'moyen'/'faible'), details}
+    Références (commentaires) :
+      - PT = traitement de référence dans le localisé (IBJSR6 F418 L31-L35).
+      - Surveillance active pour bas-risque (AFU localisé, section dédiée ‘surveillance active’).
+      - RT externe/curiethérapie selon risque; HT courte avec RT si intermédiaire défavorable (AFU localisé).
+    """
+    risque = prostate_risk_damico(psa, isup, cT)
+    options = []
+    idx = 1
+
+    if risque == "faible":
+        # Surveillance active — fort (standard bas-risque)
+        options.append({
+            "label": f"Option {idx} : Surveillance active",
+            "degre": "fort",
+            "details": "Bas-risque (T1–T2a, PSA<10, ISUP1). Éviter sur-traitement ; suivi structuré (PSA/IRM/cysto-biopsies selon protocole local)."
+            # AFU localisé : SA recommandée pour bas-risque.
+        }); idx += 1
+
+        # Prostatectomie totale — fort si espérance de vie > 10 ans
+        deg = "fort" if esperance_vie_ans >= 10 else "moyen"
+        options.append({
+            "label": f"Option {idx} : Prostatectomie totale (PT)",
+            "degre": deg,
+            "details": "Traitement de référence chirurgical ; bénéfice attendu si espérance de vie ≥10 ans."
+            # IBJSR6 F418 L31-L35 : PT = un des traitements de référence du CaP localisé.
+        }); idx += 1
+
+        # Radiothérapie externe / curiethérapie — moyen
+        options.append({
+            "label": f"Option {idx} : Radiothérapie (RCMI/curiethérapie)",
+            "degre": "moyen",
+            "details": "Alternative non invasive ; SA préférée si bas-risque pur ; pas d’HT associée en bas-risque."
+            # AFU localisé : RT standard dans localisé ; HT pas indiquée en bas-risque.
+        }); idx += 1
+
+    elif risque == "intermédiaire":
+        # RT +/− hormonothérapie courte — fort si 'intermédiaire défavorable'
+        options.append({
+            "label": f"Option {idx} : Radiothérapie externe ± hormonothérapie 4–6 mois",
+            "degre": "fort",
+            "details": "RT standard ; HT courte si facteurs défavorables (ISUP3, ≥50% biopsies positives, PSA proche 20)."
+            # AFU localisé : RT + HT courte pour intermédiaire défavorable (durée typique 4–6 mois).
+        }); idx += 1
+
+        # Prostatectomie totale ± curage — fort si opérable
+        options.append({
+            "label": f"Option {idx} : Prostatectomie totale ± curage pelvien",
+            "degre": "fort",
+            "details": "Option de référence si opérable ; discuter marges/nerve-sparing selon tumeur."
+            # IBJSR6 F418 L31-L35 : PT = traitement de référence.
+        }); idx += 1
+
+        # Surveillance active — faible (sélection ultra-stricte)
+        options.append({
+            "label": f"Option {idx} : Surveillance active (sélectionnée)",
+            "degre": "faible",
+            "details": "À éviter si critères défavorables ; réservée à des cas très sélectionnés."
+        }); idx += 1
+
+    else:  # élevé
+        # RT + HT longue (18–36 mois) — fort
+        options.append({
+            "label": f"Option {idx} : Radiothérapie + hormonothérapie prolongée (18–36 mois)",
+            "degre": "fort",
+            "details": "Standard haut-risque ; bénéfice en survie ; intensifications possibles selon contexte."
+            # AFU localisé : haut-risque → RT + ADT longue.
+        }); idx += 1
+
+        # Prostatectomie totale ± traitements complémentaires — moyen (sélectionné)
+        options.append({
+            "label": f"Option {idx} : Prostatectomie totale (sélectionnée) ± RT/HT adjuvantes",
+            "degre": "moyen",
+            "details": "Discutée en RCP (marges, pT3, pN+). Soins complémentaires selon anatomo-path et facteurs."
+        }); idx += 1
+
+    notes = [
+        "Toujours décision partagée en RCP et avec le patient.",
+        "Hypofractionnements/modulations selon plateau technique (service de RT).",
+    ]
+    donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", cT), ("Espérance de vie", f"{esperance_vie_ans} ans")]
+    return {"donnees": donnees, "risque": risque, "options": options, "notes": notes}
+
+
+# --- 3) Récidive (définition & CAT simple) ---
+def detect_recurrence(type_initial: str, psa_actuel: float, psa_nadir_post_rt: float | None, confirmations: int) -> tuple[bool, str]:
+    """
+    - Après prostatectomie : récidive biologique si PSA ≥ 0,2 ng/mL confirmé (deux dosages).
+    - Après radiothérapie : 'Phoenix' = nadir + 2,0 ng/mL.
+    Réfs AFU (récidive) : IBJSR6 — sections 'récidive' (ex. F414 L1-L6 sur diagnostic de récidive locale).
+    """
+    if type_initial == "Prostatectomie":
+        if psa_actuel >= 0.2 and confirmations >= 2:
+            return True, "Récidive biologique après prostatectomie (PSA ≥ 0,2 ng/mL confirmé)."
+        return False, "Pas de récidive biologique confirmée (après prostatectomie)."
+    else:  # Radiothérapie
+        if (psa_nadir_post_rt is not None) and (psa_actuel >= psa_nadir_post_rt + 2.0):
+            return True, "Récidive biologique après radiothérapie (nadir + 2)."
+        return False, "Pas de récidive biologique selon Phoenix (après radiothérapie)."
+
+
+def plan_prostate_recidive(type_initial: str, psa_actuel: float, psa_nadir_post_rt: float | None, confirmations: int):
+    """
+    Retourne {resume, options, notes}
+    Options avec degré indicatif; à affiner selon imagerie (PSMA-PET/IRM), délai, marge, pT, pN, vitesse PSA.
+    """
+    est_recidive, resume = detect_recurrence(type_initial, psa_actuel, psa_nadir_post_rt, confirmations)
+    options, idx = [], 1
+
+    if est_recidive:
+        if type_initial == "Prostatectomie":
+            options.append({"label": f"Option {idx} : Radiothérapie de rattrapage du lit prostatique ± bassin",
+                            "degre": "fort",
+                            "details": "À initier précocement ; ± hormonothérapie courte selon facteurs."}); idx += 1
+            options.append({"label": f"Option {idx} : Hormonothérapie seule (si non éligible RT/chir ou progression)",
+                            "degre": "moyen",
+                            "details": "Approche palliative/d’inhibition androgénique selon cinétique PSA/symptômes."}); idx += 1
+        else:
+            options.append({"label": f"Option {idx} : Traitement local de rattrapage (salvage) sélectionné",
+                            "degre": "moyen",
+                            "details": "Prostatectomie de rattrapage/curiethérapie/HIFU/cryothérapie selon localisation et expertise."}); idx += 1
+            options.append({"label": f"Option {idx} : Hormonothérapie ± traitements systémiques",
+                            "degre": "moyen",
+                            "details": "Si échec local/oligo vs polyprogression ; imagerie de re-stadification requise."}); idx += 1
+        notes = [
+            "Re-stadifier (IRM, TEP-PSMA si dispo) avant rattrapage.",
+            "Discuter en RCP radio-onco/uro/nucléo.",
+        ]
+    else:
+        options = [{"label": "Option 1 : Poursuivre la surveillance",
+                    "degre": "moyen",
+                    "details": "Contrôles PSA et imagerie selon protocole ; pas d’argument de récidive pour l’instant."}]
+        notes = []
+
+    return {"resume": resume, "options": options, "notes": notes}
+
+
+# --- 4) Métastatique (mHSPC vs mCRPC) ---
+def plan_prostate_metastatique(testosterone_castration: bool,
+                               volume_eleve: bool,
+                               symptomes_osseux: bool,
+                               deja_docetaxel: bool,
+                               deja_arpi: bool,
+                               alteration_HRR: bool):
+    """
+    Retourne {profil, options, adjoints, notes}
+    Références (AFU récidive/métastatique — Abup6x-main.pdf) :
+      - mHSPC : intensification HTNG (abiratérone/enzalutamide/apalutamide) supérieure au docétaxel ; docétaxel utile surtout en haut volume (F469 L41-L47 ; F470 L50-L52).
+      - Support osseux : zoledronate/denosumab pour fractures/symptômes (F471 L28-L36).
+      - mCRPC : iPARP si altérations HRR (PROfound, TRITON-3) ; cabazitaxel après docétaxel (NEJM 2019) (F515–F516 ; F533 L29-L32).
+    """
+    options, idx = [], 1
+    adjoints = []
+    profil = "mHSPC (sensible à la castration)" if not testosterone_castration else "mCRPC (résistant à la castration)"
+
+    if not testosterone_castration:
+        # mHSPC
+        options.append({"label": f"Option {idx} : ADT + ARPI (abiratérone OU enzalutamide OU apalutamide)",
+                        "degre": "fort",
+                        "details": "Intensification standard de 1re ligne mHSPC."}); idx += 1
+        if volume_eleve:
+            options.append({"label": f"Option {idx} : ADT + docétaxel (haut volume)",
+                            "degre": "moyen",
+                            "details": "Bénéfice surtout en haut volume ; discuter toxicité et comorbidités."}); idx += 1
+        else:
+            options.append({"label": f"Option {idx} : ADT seule (si contre-indication à l’intensification)",
+                            "degre": "faible",
+                            "details": "Moins performant ; réservé si CI/fragilité."}); idx += 1
+
+    else:
+        # mCRPC
+        if not deja_arpi:
+            options.append({"label": f"Option {idx} : ARPI (enzalutamide OU abiratérone)",
+                            "degre": "fort",
+                            "details": "Standard mCRPC 1re ligne selon exposition antérieure."}); idx += 1
+        if not deja_docetaxel:
+            options.append({"label": f"Option {idx} : Docétaxel",
+                            "degre": "fort",
+                            "details": "Chimiothérapie de référence si éligible ; surtout si symptomatique/rapide progression."}); idx += 1
+        else:
+            options.append({"label": f"Option {idx} : Cabazitaxel (après docétaxel)",
+                            "degre": "fort",
+                            "details": "Supérieur à switch ARPI/ARPI dans procès comparatifs ; standard après docétaxel."}); idx += 1
+        if alteration_HRR:
+            options.append({"label": f"Option {idx} : iPARP (olaparib/rucaparib) chez altérations BRCA/HRR",
+                            "degre": "fort",
+                            "details": "Efficacité démontrée (PROfound/TRITON-3) ; combinaisons ARPI+iPARP possibles selon autorisations/local."}); idx += 1
+
+    # Mesures adjointes
+    if symptomes_osseux:
+        adjoints.append("Soins osseux : acide zolédronique ou denosumab ; supplémentation Ca/Vit D ; évaluer radiothérapie antalgique ciblée.")
+
+    notes = ["Toujours décision en RCP. Séquençage selon expositions antérieures, comorbidités, préférences patient."]
+    return {"profil": profil, "options": options, "adjoints": adjoints, "notes": notes}
 
 # =========================
 # LOGIQUE CLINIQUE — REIN (localisé, métastatique, biopsie)
@@ -2386,6 +2610,124 @@ def render_hbp_page():
         report_text = build_report_text("CAT HBP (triage PSAD)", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_HBP")
 
+# =========================
+# PAGES — PROSTATE (UI)
+# =========================
+
+def render_prostate_menu():
+    btn_home_and_back()
+    st.markdown("## Tumeur de la prostate")
+    st.caption("Choisissez le sous-module")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.button("Localisée", use_container_width=True, on_click=lambda: go_module("Prostate: Localisée"))
+    with c2:
+        st.button("Récidive", use_container_width=True, on_click=lambda: go_module("Prostate: Récidive"))
+    with c3:
+        st.button("Métastatique", use_container_width=True, on_click=lambda: go_module("Prostate: Métastatique"))
+
+
+def render_prostate_localise_page():
+    btn_home_and_back(show_back=True, back_label="Tumeur de la prostate")
+    st.header("🔷 Prostate localisée — stratification & CAT")
+    with st.form("prost_loc_form"):
+        cT = st.selectbox("Stade clinique (cT)", ["T1", "T2a", "T2b", "T2c", "T3a", "T3b", "T4"])
+        psa = st.number_input("PSA (ng/mL)", min_value=0.0, step=0.1, value=7.0)
+        isup = st.selectbox("ISUP (1–5)", [1, 2, 3, 4, 5])
+        exp = st.number_input("Espérance de vie estimée (ans)", min_value=1, max_value=30, value=12)
+        submitted = st.form_submit_button("🔎 Générer la CAT — Localisée")
+
+    if submitted:
+        plan = plan_prostate_localise(psa, isup, cT, exp)
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        render_kv_table("📊 Stratification", [("Risque", plan["risque"].upper())], "Élément", "Résultat")
+        st.markdown("### 💊 Options de traitement")
+        for x in plan["options"]:
+            st.markdown(f"- **{x['label']}** — *niveau de reco : {x['degre']}*  \n  {x['details']}")
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for n in plan["notes"]:
+                st.markdown(f"- {n}")
+
+        sections = {
+            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
+            "Stratification": [f"Risque : {plan['risque'].upper()}"],
+            "Options": [f"{o['label']} — {o['degre']} : {o['details']}" for o in plan["options"]],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT Prostate Localisée", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Prostate_Localisee")
+
+
+def render_prostate_recidive_page():
+    btn_home_and_back(show_back=True, back_label="Tumeur de la prostate")
+    st.header("🔷 Prostate — Récidive (biologique)")
+
+    with st.form("prost_rec_form"):
+        type_initial = st.selectbox("Traitement initial", ["Prostatectomie", "Radiothérapie"])
+        psa_actuel = st.number_input("PSA actuel (ng/mL)", min_value=0.0, step=0.01, value=0.18)
+        psa_nadir = None
+        conf = st.number_input("Nombre de dosages confirmant (si prostatectomie)", min_value=1, max_value=3, value=1)
+        if type_initial == "Radiothérapie":
+            psa_nadir = st.number_input("PSA nadir post-RT (si connu)", min_value=0.0, step=0.01, value=0.1)
+        submitted = st.form_submit_button("🔎 Évaluer la récidive")
+
+    if submitted:
+        plan = plan_prostate_recidive(type_initial, psa_actuel, psa_nadir, conf)
+        st.markdown(f"**Résumé :** {plan['resume']}")
+        st.markdown("### 💊 Options")
+        for x in plan["options"]:
+            st.markdown(f"- **{x['label']}** — *{x['degre']}*  \n  {x['details']}")
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for n in plan["notes"]:
+                st.markdown(f"- {n}")
+
+        sections = {
+            "Résumé": [plan["resume"]],
+            "Options": [f"{o['label']} — {o['degre']} : {o['details']}" for o in plan["options"]],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT Prostate Récidive", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Prostate_Recidive")
+
+
+def render_prostate_meta_page():
+    btn_home_and_back(show_back=True, back_label="Tumeur de la prostate")
+    st.header("🔷 Prostate métastatique — mHSPC / mCRPC")
+
+    with st.form("prost_meta_form"):
+        testo_castration = st.radio("Testostérone < 50 ng/dL (castration) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        volume_eleve = st.radio("Volume de la maladie élevé (ex : haut volume) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        sympt_os = st.radio("Symptômes osseux ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        deja_doc = st.radio("Docétaxel déjà reçu ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        deja_arpi = st.radio("ARPI (abiratérone/enzalutamide/apalutamide) déjà reçu ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        alt_HRR = st.radio("Altération gènes HRR (BRCA/ATM) connue ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        submitted = st.form_submit_button("🔎 Générer la CAT — Métastatique")
+
+    if submitted:
+        plan = plan_prostate_metastatique(testo_castration, volume_eleve, sympt_os, deja_doc, deja_arpi, alt_HRR)
+        render_kv_table("🧾 Profil", [("Statut", plan["profil"])])
+        st.markdown("### 💊 Options")
+        for x in plan["options"]:
+            st.markdown(f"- **{x['label']}** — *{x['degre']}*  \n  {x['details']}")
+        if plan["adjoints"]:
+            st.markdown("### ➕ Mesures adjointes")
+            for a in plan["adjoints"]:
+                st.markdown(f"- {a}")
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for n in plan["notes"]:
+                st.markdown(f"- {n}")
+
+        sections = {
+            "Profil": [plan["profil"]],
+            "Options": [f"{o['label']} — {o['degre']} : {o['details']}" for o in plan["options"]],
+            "Mesures adjointes": plan["adjoints"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("CAT Prostate Métastatique", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Prostate_Metastatique")
 
 # =========================
 # ROUTING + FALLBACK
@@ -2446,5 +2788,13 @@ elif page == "Lithiase":
     render_lithiase_page()
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
     render_hbp_page()
+elif page == "Tumeur de la prostate":
+    render_prostate_menu()
+elif page == "Prostate: Localisée":
+    render_prostate_localise_page()
+elif page == "Prostate: Récidive":
+    render_prostate_recidive_page()
+elif page == "Prostate: Métastatique":
+    render_prostate_meta_page()
 else:
     render_generic(page)
