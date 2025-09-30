@@ -1056,14 +1056,12 @@ def plan_tvim(
 ):
     """
     Alternative TMT affichée seulement si TOUS les critères sont satisfaits :
-      - RTUTV complète
       - T2–T3 (ou t2_localise = True)
       - N0 (cN_pos = False)
       - M0 (metastases = False)
       - Pas de CIS diffus
       - Pas d’hydronéphrose
       - Bonne fonction vésicale
-      - Patient informé et compliant
     """
     traitement, surveillance, notes = [], [], []
 
@@ -1086,7 +1084,6 @@ def plan_tvim(
     # Vérification stricte de l'éligibilité à l'ALTERNATIVE TMT
     stade_ok = (t_cat.upper() in {"T2", "T3"}) or bool(t2_localise)
     strict_tmt_ok = all([
-        bool(rtutv_complete),
         bool(patient_compliant),
         stade_ok,
         not bool(cN_pos),         # N0
