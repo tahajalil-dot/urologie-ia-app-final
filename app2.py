@@ -1950,27 +1950,23 @@ def render_tvim_page():
         metastases = st.radio("Métastases à distance ?", ["Non", "Oui"], horizontal=True) == "Oui"
         st.markdown("#### Éligibilités & contexte")
         cis_eligible = st.radio("Éligible Cisplatine (PS 0–1, DFG ≥50–60…)?", ["Oui", "Non"], horizontal=True) == "Oui"
-        t2_localise = st.radio("Tumeur T2 localisée (unique, mobile) ?", ["Oui", "Non"], horizontal=True) == "Oui"
         hydron = st.radio("Hydronéphrose ?", ["Non", "Oui"], horizontal=True) == "Oui"
         bonne_fct_v = st.radio("Bonne fonction vésicale ?", ["Oui", "Non"], horizontal=True) == "Oui"
         cis_diffus = st.radio("CIS diffus ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        pdl1_pos = st.radio("PD-L1 positif (si dispo) ?", ["Non", "Oui"], horizontal=True) == "Oui"
         post_op_high_risk = st.radio("pT3–4 et/ou pN+ attendu/identifié ?", ["Non", "Oui"], horizontal=True) == "Oui"
         neo_adjuvant_fait = st.radio("Néoadjuvant déjà réalisé ?", ["Non", "Oui"], horizontal=True) == "Oui"
         submitted = st.form_submit_button("🔎 Générer la CAT – TVIM")
     if submitted:
         plan = plan_tvim(
-            t_cat, cN_pos, metastases, cis_eligible, t2_localise, hydron,
-            bonne_fct_v, cis_diffus, pdl1_pos, post_op_high_risk, neo_adjuvant_fait
+            t_cat, cN_pos, metastases, cis_eligible, hydron,
+            bonne_fct_v, cis_diffus, post_op_high_risk, neo_adjuvant_fait
         )
         donnees_pairs = [
             ("T", t_cat), ("cN+", "Oui" if cN_pos else "Non"), ("Métastases", "Oui" if metastases else "Non"),
             ("Éligible Cisplatine", "Oui" if cis_eligible else "Non"),
-            ("T2 localisée (TMT possible)", "Oui" if t2_localise else "Non"),
             ("Hydronéphrose", "Oui" if hydron else "Non"),
             ("Bonne fonction vésicale", "Oui" if bonne_fct_v else "Non"),
             ("CIS diffus", "Oui" if cis_diffus else "Non"),
-            ("PD-L1 positif", "Oui" if pdl1_pos else "Non"),
             ("pT3–4/pN+ attendu/identifié", "Oui" if post_op_high_risk else "Non"),
             ("NAC déjà faite", "Oui" if neo_adjuvant_fait else "Non"),
         ]
