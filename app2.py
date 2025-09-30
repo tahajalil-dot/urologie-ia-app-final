@@ -336,9 +336,7 @@ def _plan_hbp_core(
             options.append(
                 f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) (tolérance bonne, efficacité modeste)."
             ); n += 1
-            options.append(
-                f"Option {n} : traitement mini-invasif — incision cervico-prostatique (≤ 30–40 mL), implants, vapeur d’eau (Rezūm) selon disponibilité."
-            ); n += 1
+          
 
     # (3) Indication chirurgicale stricte → chirurgie si possible, sinon alternatives/palliatif
     if indication_chir_stricte and not ci_chirurgie and not refus_chir:
