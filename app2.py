@@ -1081,7 +1081,6 @@ def plan_tvim(
     # Vérification stricte de l'éligibilité à l'ALTERNATIVE TMT
     stade_ok = (t_cat.upper() in {"T2", "T3"}) 
     strict_tmt_ok = all([
-        bool(patient_compliant),
         stade_ok,
         not bool(cN_pos),         # N0
         not bool(metastases),     # M0
