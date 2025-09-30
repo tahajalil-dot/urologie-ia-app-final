@@ -353,8 +353,7 @@ def plan_hbp(
         options.append(f"Option {opt_idx} : traitement médical — Inhibiteur de la 5‑α‑réductase (finastéride/dutastéride) si volume ≥ 40 mL ou PSA ≥ 1,5 (effet après 3-6 mois)."); opt_idx += 1
         options.append(f"Option {opt_idx} : traitement médical — Association alpha‑bloquant + 5‑ARI si symptômes importants ET gros volume."); opt_idx += 1 
         if ipss <= 7:
-            options.append(f"Option {opt_idx} : Le patient doit être informé et rassuré sur le faible risque évolutif et le caractère bénin de sa pathologie.
-Des conseils hygiénodiététiques peuvent être donnés, notamment : la réduction des apports hydriques après 18 heures, la diminution de la consommation de caféine et d’alcool, le traitement d’une constipation associée et l’arrêt des traitements favorisant la dysurie (anticholinergiques, neuroleptiques, etc.).."); opt_idx += 1
+            options.append(f"Option {opt_idx} : Le patient doit être informé et rassuré sur le faible risque évolutif et le caractère bénin de sa pathologie.Des conseils hygiénodiététiques peuvent être donnés, notamment : la réduction des apports hydriques après 18 heures, la diminution de la consommation de caféine et d’alcool, le traitement d’une constipation associée et l’arrêt des traitements favorisant la dysurie (anticholinergiques, neuroleptiques, etc.).."); opt_idx += 1
         if ipss >= 8 and not (ci_chirurgie or refus_chir):
             if 30 <= volume_ml <= 80 or lobe_median:
                 options.append(f"Option {opt_idx} : traitement chirurgical — RTUP (mono/bipolaire), standard 30–80 mL; privilégier si lobe médian."); opt_idx += 1
