@@ -2629,12 +2629,10 @@ def render_hbp_page():
     with st.form("hbp_form"):
         age = st.number_input("Âge", min_value=40, max_value=100, value=65)
         volume = st.number_input("Volume prostatique (mL)", min_value=10, max_value=250, value=45)
-        lobe_median = st.radio("Lobe médian présent ?", ["Non", "Oui"], horizontal=True) == "Oui"
         ipss = st.slider("Score IPSS", 0, 35, 18)
         psa_total = st.number_input("PSA total (ng/mL)", min_value=0.0, step=0.1, value=1.6)
         tr_suspect = st.radio("Toucher rectal suspect ?", ["Non", "Oui"], horizontal=True) == "Oui"
         anticoag = st.radio("Anticoagulants/antiagrégants ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        preservation_ejac = st.radio("Souhaite préserver l’éjaculation ?", ["Non", "Oui"], horizontal=True) == "Oui"
         ci_chirurgie = st.radio("Contre-indication à la chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
         refus_chir = st.radio("Refus de chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
 
