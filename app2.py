@@ -2650,8 +2650,8 @@ def render_hbp_page():
 
     if submitted:
         plan = plan_hbp(
-            age, volume, lobe_median, ipss, psa_total, tr_suspect, anticoag,
-            preservation_ejac, ci_chirurgie, refus_chir, infections_recid,
+            age, volume, ipss, psa_total, tr_suspect, anticoag,
+            ci_chirurgie, refus_chir, infections_recid,
             retention, calculs, hematurie_recid, ir_post_obstacle, echec_medical
         )
 
