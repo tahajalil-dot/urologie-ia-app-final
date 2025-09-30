@@ -322,11 +322,10 @@ def _plan_hbp_core(
             ); n += 1
             if volume_ml > 40:
                 options.append(
-                    f"Option {n} : inhibiteur de la 5α-réductase (finastéride/dutastéride) si volume > 40 mL "
-                    "(effet en plusieurs mois, ↓volume ~20 %, ↓risque de RAU; PSA mesuré ≈ 50 % du réel)."
+                    f"Option {n} : inhibiteur de la 5α-réductase L , ↓risque de RAU car il diminue le volume prostatique; PSA mesuré ≈ 50 % du réel, efficacité sur plus de 3 mois )."
                 ); n += 1
                 options.append(
-                    f"Option {n} : association α-bloquant + I5AR si monothérapie insuffisante (efficacité supérieure; EI cumulatifs)."
+                    f"Option {n} : association α-bloquant + I5AR si monothérapie insuffisante ."
                 ); n += 1
             if stockage_predominant and (rpm_ml is not None and rpm_ml < 150):
                 options.append(
@@ -334,7 +333,7 @@ def _plan_hbp_core(
                     "(plutôt en ajout si persistance sous α-bloquant)."
                 ); n += 1
             options.append(
-                f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) (tolérance bonne, efficacité modeste)."
+                f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) ."
             ); n += 1
           
 
