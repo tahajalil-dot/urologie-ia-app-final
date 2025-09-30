@@ -205,7 +205,7 @@ def show_protocol_image():
 
 
 # =========================
-# LOGIQUE CLINIQUE — HBP (PSAD + CAT)
+# LOGIQUE CLINIQUE — HBP (PSAD + CAT) — v2 alignée A–D
 # =========================
 
 def classer_ipss(ipss: int) -> str:
@@ -218,9 +218,9 @@ def classer_ipss(ipss: int) -> str:
 
 def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: bool):
     """
-    TRIAGE CANCER (ADK) BASÉ SUR PSAD UNIQUEMENT (PSA 4–10) + TR.
+    TRIAGE CANCER (ADK) BASÉ SUR PSAD (si 4 ≤ PSA < 10) + TR.
     Retourne (suspect_adk: bool, explications: list[str], psad: float|None).
-    Règles: 
+    Règles:
       - TR suspect → ADK
       - PSA ≥ 10 → ADK
       - 4 ≤ PSA < 10 → PSAD = PSA/volume ; si PSAD > 0,15 → ADK ; sinon HBP
@@ -237,18 +237,19 @@ def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: bool):
         exp.append("PSA ≥ 10 ng/mL → orientation cancer de la prostate.")
         return True, exp, psad
 
-    if psa_total >= 4.0:
+    if 4.0 <= psa_total < 10.0:
         if volume_ml > 0:
             psad = psa_total / float(volume_ml)
             exp.append(f"Densité PSA (PSAD) = {psad:.2f}.")
             if psad > 0.15:
-                exp.append("PSAD > 0,15 → critère suspect.")
+                exp.append("PSAD > 0,15 → critère suspect (orientation ADK).")
                 return True, exp, psad
             else:
-                exp.append("PSAD ≤ 0,15 → on poursuit l’analyse HBP.")
+                exp.append("PSAD ≤ 0,15 → poursuite de l'analyse HBP.")
         else:
             exp.append("Volume inconnu/0 → PSAD non calculable; prudence clinique.")
 
+    # PSA < 4 ou PSAD rassurant → pas d’orientation ADK immédiate
     return False, exp, psad
 
 
@@ -268,14 +269,18 @@ def plan_hbp(
     calculs: bool,
     hematurie_recid: bool,
     ir_post_obstacle: bool,
-    echec_medical: bool,   # ← NOUVEAU
+    echec_medical: bool,   # échec/intolérance d'un traitement médical bien conduit
+    # --- Nouveaux paramètres pour coller aux recommandations ---
+    stockage_predominant: bool = False,  # SBAU de remplissage prédominants (urgence/fréquence)
+    rpm_ml: int | None = None,           # Résidu post-mictionnel
+    dysfonction_erectile: bool = False,  # DE associée (pour IPDE5)
 ):
-    """Retourne dict {donnees, traitement, notes}
-    Règles demandées :
-      - *Indication chirurgicale stricte* (échec médical OU complications OU lobe médian)
-        ⇒ **ne pas proposer** d'options médicales.
-      - Présenter toutes les propositions sous forme "Option 1, Option 2, ...",
-        avec étiquette "traitement médical" / "traitement chirurgical" / "alternative".
+    """
+    Retourne dict {donnees, traitement, notes}
+    Principes (alignés A–D) :
+      - Lobe médian ≠ indication chirurgicale stricte à lui seul (oriente la technique).
+      - Indication chirurgicale stricte si : complications HBP OU échec/intolérance du médical.
+      - Présenter les options : "Option N : [type] — [contenu]".
     """
     donnees = [
         ("Âge", f"{age} ans"),
@@ -290,94 +295,166 @@ def plan_hbp(
         (
             "Complications",
             ", ".join([
-                txt
-                for ok, txt in [
+                txt for ok, txt in [
                     (infections_recid, "IU récidivantes"),
-                    (retention, "Rétention urinaire"),
-                    (calculs, "Calculs vésicaux"),
-                    (ir_post_obstacle, "Altération fonction rénale liée à l’obstacle"),
-                ]
-                if ok
-            ])
-            or "Aucune",
+                    (retention, "Rétention urinaire compliquée/sevrage impossible"),
+                    (calculs, "Calcul vésical"),
+                    (hematurie_recid, "Hématurie récidivante liée à l’HBP"),
+                    (ir_post_obstacle, "IR chronique/obstructive liée à l’obstacle"),
+                ] if ok
+            ]) or "Aucune",
         ),
         ("Échec du traitement médical", "Oui" if echec_medical else "Non"),
+        ("SBAU de remplissage prédominants", "Oui" if stockage_predominant else "Non"),
     ]
+    if rpm_ml is not None:
+        donnees.append(("Résidu post-mictionnel (RPM)", f"{rpm_ml} mL"))
+    if dysfonction_erectile:
+        donnees.append(("Dysfonction érectile associée", "Oui"))
 
-    # 0) Triage ADK basé sur PSAD + TR
+    # 0) Triage ADK
     suspect_adk, exp_adk, psad = eval_suspicion_adk(psa_total, volume_ml, tr_suspect)
     if psad is not None:
         donnees.append(("Densité PSA (PSAD)", f"{psad:.2f}"))
 
     if suspect_adk:
         traitement = [
-            "Orientation ADK prostatique →",
-            "→ IRM prostatique multiparamétrique.",
-            "→ Biopsies prostatiques ciblées ± systématiques (selon IRM/PIRADS).",
-
+            "Option 1 : orientation oncologique — IRM prostatique multiparamétrique.",
+            "Option 2 : orientation oncologique — Biopsies prostatiques ciblées ± systématiques (selon PIRADS).",
         ]
         notes = exp_adk
         return {"donnees": donnees, "traitement": traitement, "notes": notes}
 
-    # 1) Déterminer si indication chirurgicale stricte
+    # 1) Indication chirurgicale stricte (conforme C.1) = complications OU échec médical
     complications_presentes = any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle])
-    indication_chir_stricte = echec_medical or lobe_median or complications_presentes
+    indication_chir_stricte = echec_medical or complications_presentes
 
     options = []
-    opt_idx = 1
+    opt = 1
 
-    # 2) STRICT CHIR & chirurgie faisable → seulement options chirurgicales
+    # 2) Pas d'indication chirurgicale stricte → proposer A/B (puis C en préférence partagée)
+    if not indication_chir_stricte:
+        # A. Abstention-surveillance (si symptômes légers)
+        if ipss <= 7:
+            options.append(
+                f"Option {opt} : abstention-surveillance — informer sur l’évolution bénigne, "
+                "mesures hygiéno-diététiques (réduire apports hydriques après 18h, diminuer caféine/alcool, "
+                "traiter la constipation, revoir les traitements favorisant la dysurie)."
+            ); opt += 1
+
+        # B1. Alpha-bloquants
+        options.append(
+            f"Option {opt} : traitement médical — α-bloquant (ex. tamsulosine/alfuzosine/doxazosine). "
+            "Action rapide (heures) sur SBAU et débit; pas d’effet sur le risque de complications."
+        ); opt += 1
+
+        # B2. 5-ARI si volume > 40 mL
+        if volume_ml > 40:
+            options.append(
+                f"Option {opt} : traitement médical — inhibiteur de la 5-α-réductase (finastéride/dutastéride) si volume > 40 mL. "
+                "Effet lent (mois), ↓volume ~20%, seule classe à ↓risque de RAU; pense-bête : PSA mesuré ≈ 50% du réel."
+            ); opt += 1
+
+        # B3. Association α + 5-ARI si monothérapie insuffisante / symptômes marqués avec gros volume
+        if (volume_ml > 40 and ipss >= 8):
+            options.append(
+                f"Option {opt} : traitement médical — association α-bloquant + 5-ARI (efficacité supérieure; EI cumulatifs)."
+            ); opt += 1
+
+        # B4. IPDE5 (tadalafil 5 mg/j) même sans DE (CI nitrés)
+        if ipss >= 8:
+            msg_de = " (avec ou sans DE associée)" if not dysfonction_erectile else " (DE associée)"
+            options.append(
+                f"Option {opt} : traitement médical — IPDE5 (tadalafil 5 mg/j){msg_de}. "
+                "Améliore SBAU et débit; contre-indiqué avec dérivés nitrés et cardiopathie sévère non stabilisée."
+            ); opt += 1
+
+        # B5. Anticholinergiques si stockage prédominant et RPM < 150 mL (surtout en ajout si persistance sous α-bloquant)
+        if stockage_predominant and (rpm_ml is not None and rpm_ml < 150):
+            options.append(
+                f"Option {opt} : traitement médical — anticholinergique si SBAU de remplissage prédominants et RPM < 150 mL "
+                "(plutôt en ajout si persistance sous α-bloquant)."
+            ); opt += 1
+
+        # B6. Phytothérapie (alternative, preuves faibles)
+        options.append(
+            f"Option {opt} : alternative — phytothérapie (Serenoa repens/Pygeum africanum) : tolérance bonne, efficacité modeste/variable."
+        ); opt += 1
+
+        # C (proposition procédurale possible si préférence patient, sans indication stricte)
+        # Mini-invasifs orientés par volume et objectifs d’éjaculation
+        if not (ci_chirurgie or refus_chir):
+            if volume_ml <= 40 and not lobe_median:
+                options.append(
+                    f"Option {opt} : traitement mini-invasif — TUIP/ICP si volume ≤ 30–40 mL et sans lobe médian "
+                    "(préserve mieux l’éjaculation)."
+                ); opt += 1
+            if volume_ml < 70 and not lobe_median and preservation_ejac:
+                options.append(
+                    f"Option {opt} : traitement mini-invasif — implants urétraux (UroLift) < 70 mL, sans lobe médian, "
+                    "objectif préservation éjaculatoire."
+                ); opt += 1
+            options.append(
+                f"Option {opt} : traitement mini-invasif — thermothérapie à vapeur d’eau (Rezūm) : efficacité > médicaments, "
+                "< chirurgie; possible préservation éjaculatoire."
+            ); opt += 1
+
+    # 3) Indication chirurgicale stricte ET chirurgie faisable → techniques endoscopiques en priorité
     if indication_chir_stricte and not (ci_chirurgie or refus_chir):
-        if 30 <= volume_ml <= 80 or lobe_median or (volume_ml < 30 and lobe_median):
-            options.append(f"Option {opt_idx} : traitement chirurgical — RTUP (mono/bipolaire), standard 30–80 mL; privilégiée si lobe médian. → Bipolaire : meilleure hémostase, pas de TUR syndrome."); opt_idx += 1
+        # RTUP / Vaporisation (laser ou bipolaire)
+        if 30 <= volume_ml <= 80 or lobe_median:
+            options.append(
+                f"Option {opt} : traitement chirurgical — RTUP (mono/bipolaire) ou vaporisation endoscopique (laser/bipolaire) "
+                "pour 30–80 mL; lobe médian → RTUP/vapo plutôt que TUIP."
+            ); opt += 1
+        # Énucléation (laser/bipolaire) pour volumes élevés (remplace souvent la voie ouverte)
         if volume_ml >= 60:
-            options.append(f"Option {opt_idx} : traitement chirurgical — Énucléation endoscopique (HoLEP/ThuLEP/BipolEP), efficace pour ≥ 60–100+ mL; résultats durables, bonne hémostase."); opt_idx += 1
+            options.append(
+                f"Option {opt} : traitement chirurgical — énucléation endoscopique (HoLEP/ThuLEP/BipolEP) "
+                "efficace pour ≥ 60–100+ mL, résultats durables."
+            ); opt += 1
+        # Anticoagulation → privilégier laser/HoLEP/GreenLight
         if anticoag or (30 <= volume_ml <= 80):
-            options.append(f"Option {opt_idx} : traitement chirurgical — PVP GreenLight, utile si risque hémorragique/anticoagulants; séjour/sondage courts."); opt_idx += 1
-        if volume_ml < 30 and not lobe_median:
-            options.append(f"Option {opt_idx} : traitement chirurgical — TUIP (incision cervico‑prostatique) si < 30 mL et **sans** lobe médian (meilleure préservation éjaculatoire)."); opt_idx += 1
-        if volume_ml < 70 and not lobe_median and preservation_ejac:
-            options.append(f"Option {opt_idx} : traitement chirurgical — Implants urétraux (UroLift) < 70 mL, **sans** lobe médian, objectif préservation éjaculation."); opt_idx += 1
+            options.append(
+                f"Option {opt} : traitement chirurgical — vaporisation laser (GreenLight) en cas de risque hémorragique/anticoagulants; "
+                "séjour/sondage courts."
+            ); opt += 1
+        # Très gros volumes / plateau technique indisponible
         if volume_ml > 100:
-            options.append(f"Option {opt_idx} : traitement chirurgical — Adénomectomie voie haute (ouverte/robot) pour très gros volumes ou si énucléation indisponible."); opt_idx += 1
+            options.append(
+                f"Option {opt} : traitement chirurgical — adénomectomie sus-pubienne (voie ouverte/robot) "
+                "si très gros volume ou si énucléation indisponible."
+            ); opt += 1
+        # TUIP si petit volume sans lobe médian (utile même en indication stricte sélectionnée)
+        if volume_ml <= 40 and not lobe_median:
+            options.append(
+                f"Option {opt} : traitement chirurgical — TUIP/ICP si ≤ 30–40 mL et sans lobe médian "
+                "(meilleure préservation éjaculatoire)."
+            ); opt += 1
 
-    # 3) STRICT CHIR mais chirurgie impossible (CI/refus) → alternatives
+    # 4) Indication chirurgicale stricte MAIS chirurgie impossible (CI/refus) → alternatives + palliatifs
     if indication_chir_stricte and (ci_chirurgie or refus_chir):
         if volume_ml > 80:
-            options.append(f"Option {opt_idx} : alternative — Embolisation des artères prostatiques (discussion RCP) si CI/refus de chirurgie et gros volume."); opt_idx += 1
-        options.append(f"Option {opt_idx} : alternative — Optimisation médicale et/ou sondages intermittents si besoin (dernier recours)."); opt_idx += 1
+            options.append(
+                f"Option {opt} : alternative — embolisation des artères prostatiques (discussion RCP) si gros volume et CI/refus."
+            ); opt += 1
+        options.append(
+            f"Option {opt} : palliatif — autosondages intermittents, ou sonde à demeure / cathéter sus-pubien selon contexte."
+        ); opt += 1
 
-    # 4) PAS indication stricte → d’abord médical, puis chir (préférence partagée)
-    if not indication_chir_stricte:
-        options.append(f"Option {opt_idx} : traitement médical — Alpha‑bloquant (tamsulosine,Alfusozine...)."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Inhibiteur de la 5‑α‑réductase (finastéride/dutastéride) si volume ≥ 40 mL ou PSA ≥ 1,5 (effet après 3-6 mois)."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Association alpha‑bloquant + 5‑ARI si symptômes importants ET gros volume."); opt_idx += 1 
-        if ipss <= 7:
-            options.append(f"Option {opt_idx} : Le patient doit être informé et rassuré sur le faible risque évolutif et le caractère bénin de sa pathologie.Des conseils hygiénodiététiques peuvent être donnés, notamment : la réduction des apports hydriques après 18 heures, la diminution de la consommation de caféine et d’alcool, le traitement d’une constipation associée et l’arrêt des traitements favorisant la dysurie (anticholinergiques, neuroleptiques, etc.).."); opt_idx += 1
-        if ipss >= 8 and not (ci_chirurgie or refus_chir):
-            if 30 <= volume_ml <= 80 or lobe_median:
-                options.append(f"Option {opt_idx} : traitement chirurgical — RTUP (mono/bipolaire), standard 30–80 mL; privilégier si lobe médian."); opt_idx += 1
-            if volume_ml >= 60:
-                options.append(f"Option {opt_idx} : traitement chirurgical — Énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour volumes ≥ 60–100+ mL."); opt_idx += 1
-            if anticoag or (30 <= volume_ml <= 80):
-                options.append(f"Option {opt_idx} : traitement chirurgical — PVP GreenLight si risque hémorragique/anticoagulants."); opt_idx += 1
-            if volume_ml < 30 and not lobe_median:
-                options.append(f"Option {opt_idx} : traitement chirurgical — TUIP si < 30 mL et sans lobe médian."); opt_idx += 1
-            if volume_ml < 70 and not lobe_median and preservation_ejac:
-                options.append(f"Option {opt_idx} : traitement chirurgical — Implants urétraux (UroLift) si objectif préservation éjaculation."); opt_idx += 1
-            if volume_ml > 100:
-                options.append(f"Option {opt_idx} : traitement chirurgical — Adénomectomie voie haute (ouverte/robot) si très gros volumes."); opt_idx += 1
-
-    # Notes
+    # Notes (sécurité/technique)
     notes = []
     if anticoag:
-        notes.append("Anticoagulants/antiagrégants → privilégier PVP GreenLight/HoLEP (hémostase supérieure).")
-    if lobe_median and volume_ml < 30:
-        notes.append("Lobe médian + petit volume → préférer RTUP/énucléation plutôt que TUIP.")
+        notes.append("Anticoagulants/antiagrégants → privilégier laser/GreenLight/HoLEP (hémostase supérieure).")
+    if lobe_median and volume_ml <= 40:
+        notes.append("Lobe médian + petit volume → éviter TUIP; préférer RTUP/vapo/énucléation selon cas.")
     if preservation_ejac:
-        notes.append("Préservation éjaculation : discuter risques éjaculatoires des alpha‑bloquants et des techniques chirurgicales.")
+        notes.append("Préservation éjaculation : préférer TUIP (si sans lobe médian), UroLift, Rezūm; informer sur risques éjaculatoires des autres techniques.")
+    notes.append("Avant toute chirurgie : réaliser un ECBU.")
+    notes.append("RTUP bipolaire et lasers utilisent du sérum physiologique (pas de risque de réabsorption type glycocolle). La RTUP monopolaire nécessite glycocolle (risque de TUR syndrome).")
 
     return {"donnees": donnees, "traitement": options, "notes": notes}
+
 # =========================
 # LOGIQUE CLINIQUE — PROSTATE (Localisé / Récidive / Métastatique)
 # =========================
