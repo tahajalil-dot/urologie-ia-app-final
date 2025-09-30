@@ -288,6 +288,7 @@ def plan_hbp(
     tr_suspect: Union[bool,str,int,float],
     anticoag: Union[bool,str,int,float],
     ci_chirurgie: Union[bool,str,int,float],
+    refus_chir: Union[bool,str,int,float],   # ← AJOUTÉ ICI
     infections_recid: Union[bool,str,int,float],
     retention: Union[bool,str,int,float],
     calculs: Union[bool,str,int,float],
@@ -312,7 +313,7 @@ def plan_hbp(
     tr_suspect        = _to_bool(tr_suspect)
     anticoag          = _to_bool(anticoag)
     ci_chirurgie      = _to_bool(ci_chirurgie)
-    refus_chir        = _to_bool(refus_chir)
+    refus_chir        = _to_bool(refus_chir)   # ← AJOUTÉ ICI
     infections_recid  = _to_bool(infections_recid)
     retention         = _to_bool(retention)
     calculs           = _to_bool(calculs)
@@ -394,7 +395,6 @@ def plan_hbp(
                 f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) en association avec alphabloquant : tolérance bonne, efficacité modeste."
             ); n += 1
 
-
     # (3) Indication chirurgicale stricte → chirurgie si possible, sinon alternatives/palliatif
     if indication_chir_stricte and not (ci_chirurgie or refus_chir):
         if 30 <= volume_ml <= 70:
@@ -433,7 +433,6 @@ def plan_hbp(
         "RTUP bipolaire/lasers : sérum physiologique (pas de glycocolle). RTUP monopolaire : glycocolle (risque de TUR syndrome).",
     ]
     return {"donnees": donnees, "traitement": options, "notes": notes}
-
 
 # =========================
 # LOGIQUE CLINIQUE — PROSTATE (Localisé / Récidive / Métastatique)
