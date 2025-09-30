@@ -1038,37 +1038,84 @@ def plan_tvnim(risque: str):
 # LOGIQUE CLINIQUE — TVIM (simplifiée pour prototypage)
 # =========================
 
-def plan_tvim(t_cat: str, cN_pos: bool, metastases: bool, cis_eligible: bool, t2_localise: bool,
-              hydron: bool, bonne_fct_v: bool, cis_diffus: bool, pdl1_pos: bool,
-              post_op_high_risk: bool, neo_adjuvant_fait: bool):
+def plan_tvim(t_cat: str,
+              cN_pos: bool,
+              metastases: bool,
+              cis_eligible: bool,
+              t2_localise: bool,
+              hydron: bool,
+              bonne_fct_v: bool,
+              cis_diffus: bool,
+              pdl1_pos: bool,
+              post_op_high_risk: bool,
+              neo_adjuvant_fait: bool,
+              # --- nouveaux paramètres pour la TMT stricte ---
+              rtutv_complete: bool = False,
+              patient_compliant: bool = False):
+    """
+    TMT (tri-modale) en 'option principale' si TOUS les critères suivants:
+      - RTUTV complète
+      - Stade T2–T3 (t_cat in {"T2","T3"} ou t2_localise True)
+      - N0 (cN_pos == False) et M0 (metastases == False)
+      - Absence de CIS diffus (cis_diffus == False)
+      - Absence d'hydronéphrose (hydron == False)
+      - Bonne fonction vésicale (bonne_fct_v == True)
+      - Patient informé et compliant (patient_compliant == True)
+    Sinon: TMT proposée comme OPTION ALTERNATIVE.
+    """
     traitement, surveillance, notes = [], [], []
 
+    # Maladie métastatique: sortir tôt
     if metastases:
         traitement = ["Maladie métastatique → voir module dédié."]
         return {"traitement": traitement, "surveillance": surveillance, "notes": notes}
 
+    # Critères stricts TMT
+    stade_ok = (t_cat in {"T2", "T3"}) or bool(t2_localise)
+    strict_tmt_ok = all([
+        bool(rtutv_complete),
+        stade_ok,
+        not bool(cN_pos),          # N0
+        not bool(metastases),      # M0
+        not bool(cis_diffus),
+        not bool(hydron),
+        bool(bonne_fct_v),
+        bool(patient_compliant),
+    ])
+
+    # Voie cystectomie (avec ou sans néo-adjuvant)
     if cis_eligible and not neo_adjuvant_fait:
         traitement += [
             "Chimiothérapie néoadjuvante à base de cisplatine (MVAC dose-dense ou GemCis).",
-            "→ Puis cystectomie radicale + curage ganglionnaire. 10-12 semaines apres la derniere cure de chimio",
+            "→ Puis cystectomie radicale + curage ganglionnaire (10–12 semaines après la dernière cure).",
         ]
     else:
-        if t2_localise and bonne_fct_v and not cis_diffus and not hydron:
-            traitement += [
-                "Option tri‑modale (TMT) pour T2 sélectionné : RTUV maximale + chimioradiothérapie + surveillance.",
-            ]
-        traitement += ["Cystectomie radicale + curage ganglionnaire < 3 mois apres le diagnostic de TVIM."]
+        traitement += ["Cystectomie radicale + curage ganglionnaire (< 3 mois après le diagnostic de TVIM)."]
 
+    # TMT selon critères
+    if strict_tmt_ok:
+        traitement += [
+            "Option tri-modale (critères réunis) : RTUV complète + chimioradiothérapie + surveillance rapprochée."
+        ]
+    else:
+        # Proposer systématiquement en ALTERNATIVE si critères non tous remplis
+        traitement += [
+            "Alternative : tri-modale (hors critères stricts) — à discuter en RCP après information du patient "
+            "(viser RTUV complète si réalisable, puis chimioradiothérapie)."
+        ]
+
+    # Notes post-op haut risque
     if post_op_high_risk:
         notes += [
-            "Risque post‑op élevé (pT3–4/pN+) : discuter traitement adjuvant (p.ex. immunothérapie adjuvante).",
+            "Risque post-op élevé (pT3–4/pN+) : discuter traitement adjuvant (ex. immunothérapie adjuvante)."
         ]
 
     surveillance = [
-        "Suivi clinique, imagerie et biologie selon protocole (tous les 3–6 mois les 2 premières années).",
+        "Suivi clinique, imagerie et biologie selon protocole (tous les 3–6 mois les 2 premières années)."
     ]
 
     return {"traitement": traitement, "surveillance": surveillance, "notes": notes}
+
 
 
 # =========================
