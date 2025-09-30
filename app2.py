@@ -1043,16 +1043,13 @@ def plan_tvim(
     cN_pos: bool,
     metastases: bool,
     cis_eligible: bool,
-    t2_localise: bool,
     hydron: bool,
     bonne_fct_v: bool,
     cis_diffus: bool,
-    pdl1_pos: bool,
     post_op_high_risk: bool,
     neo_adjuvant_fait: bool,
     # critères pour l'alternative TMT
-    rtutv_complete: bool = False,
-    patient_compliant: bool = False,
+    
 ):
     """
     Alternative TMT affichée seulement si TOUS les critères sont satisfaits :
@@ -1082,7 +1079,7 @@ def plan_tvim(
         ]
 
     # Vérification stricte de l'éligibilité à l'ALTERNATIVE TMT
-    stade_ok = (t_cat.upper() in {"T2", "T3"}) or bool(t2_localise)
+    stade_ok = (t_cat.upper() in {"T2", "T3"}) 
     strict_tmt_ok = all([
         bool(patient_compliant),
         stade_ok,
