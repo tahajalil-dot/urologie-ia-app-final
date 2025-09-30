@@ -283,14 +283,11 @@ def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: Union[bool,
 def plan_hbp(
     age: int,
     volume_ml: int,
-    lobe_median: Any,             # ignoré (compat signature UI)
     ipss: int,
     psa_total: float,
     tr_suspect: Union[bool,str,int,float],
     anticoag: Union[bool,str,int,float],
-    preservation_ejac: Any,        # ignoré (compat signature UI)
     ci_chirurgie: Union[bool,str,int,float],
-    refus_chir: Union[bool,str,int,float],
     infections_recid: Union[bool,str,int,float],
     retention: Union[bool,str,int,float],
     calculs: Union[bool,str,int,float],
@@ -355,8 +352,7 @@ def plan_hbp(
         donnees.append(("Densité PSA (PSAD)", f"{psad:.2f}"))
     if suspect_adk:
         traitement = [
-            "Option 1 : orientation oncologique — IRM prostatique multiparamétrique.",
-            "Option 2 : orientation oncologique — Biopsies prostatiques ciblées ± systématiques selon IRM.",
+            "Option : IRM prostatique multiparamétrique,Biopsies prostatiques ciblées ± systématiques selon IRM.",
         ]
         return {"donnees": donnees, "traitement": traitement, "notes": exp_adk}
 
@@ -371,62 +367,55 @@ def plan_hbp(
     if not indication_chir_stricte:
         if ipss <= 7:
             options.append(
-                f"Option {n} : abstention-surveillance — informer du faible risque évolutif + conseils hygiéno-diététiques "
-                "(réduire apports hydriques après 18h, diminuer caféine/alcool, traiter la constipation, revoir iatrogénie)."
+                f"Option {n} : abstention-surveillance — informer du faible risque évolutif + conseils hygiéno-diététiques,réduire apports hydriques après 18h, diminuer caféine/alcool, traiter la constipation)."
             ); n += 1
             options.append(
                 f"Option {n} : traitement médical — α-bloquant (monothérapie). "
-                "Action rapide, améliore SBAU et débit; n’influence pas le risque de complications."
+                "Action rapide, améliore SBAU et débit."
             ); n += 1
         else:
             options.append(
-                f"Option {n} : traitement médical — α-bloquant en première intention **avec réévaluation clinique/IPSS à 4–6 semaines**."
+                f"Option {n} :  α-bloquant en première intention puis  réévaluation clinique/IPSS pour verifier si y'a une amelioration ou echec sous TTT."
             ); n += 1
             if volume_ml > 40:
                 options.append(
-                    f"Option {n} : traitement médical — inhibiteur de la 5α-réductase (finastéride/dutastéride) si volume > 40 mL "
+                    f"Option {n} : traitement médical — inhibiteur de la 5α-réductase. "
                     "(effet en plusieurs mois, ↓volume ~20 %, ↓risque de RAU; PSA mesuré ≈ 50 % du réel)."
                 ); n += 1
                 options.append(
-                    f"Option {n} : traitement médical — association α-bloquant + I5AR si monothérapie insuffisante (efficacité supérieure; EI cumulatifs)."
+                    f"Option {n} : association α-bloquant + I5AR si monothérapie insuffisante (efficacité supérieure; EI cumulatifs)."
                 ); n += 1
-            options.append(
-                f"Option {n} : traitement médical — IPDE5 (tadalafil 5 mg/j), efficacité > placebo; CI dérivés nitrés/cardiopathie non stabilisée."
-            ); n += 1
             if stockage_predominant and (rpm_ml is not None and rpm_ml < 150):
                 options.append(
-                    f"Option {n} : traitement médical — anticholinergique si LUTS de remplissage prédominants ET RPM < 150 mL "
+                    f"Option {n} : anticholinergique si  SBAU de remplissage prédominants ET RPM < 150 mL "
                     "(plutôt en ajout si persistance sous α-bloquant)."
                 ); n += 1
             options.append(
-                f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) : tolérance bonne, efficacité modeste."
+                f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) en association avec alphabloquant : tolérance bonne, efficacité modeste."
             ); n += 1
-        # Mini-invasifs (préférence partagée; efficacité entre médicaments et chirurgie)
-        options.append(
-            f"Option {n} : traitement mini-invasif — selon disponibilité : incision cervico-prostatique (≤ 30–40 mL), implants, vapeur d’eau (Rezūm)."
-        ); n += 1
+
 
     # (3) Indication chirurgicale stricte → chirurgie si possible, sinon alternatives/palliatif
     if indication_chir_stricte and not (ci_chirurgie or refus_chir):
-        if 30 <= volume_ml <= 80:
+        if 30 <= volume_ml <= 70:
             options.append(
-                f"Option {n} : traitement chirurgical — RTUP (mono/bipolaire) ou vaporisation endoscopique (laser/bipolaire) pour 30–80 mL."
+                f"Option {n} : RTUP (mono/bipolaire) ou vaporisation endoscopique (laser/bipolaire) pour 30–70 mL."
             ); n += 1
-        if volume_ml >= 60:
+        if volume_ml >= 71:
             options.append(
-                f"Option {n} : traitement chirurgical — énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour ≥ 60–100+ mL."
+                f"Option {n} : énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour ≥ 70–100+ mL."
             ); n += 1
         if volume_ml > 100:
             options.append(
-                f"Option {n} : traitement chirurgical — adénomectomie sus-pubienne (ouverte/robot) si très gros volumes ou si énucléation indisponible."
+                f"Option {n} : traitement chirurgical — adénomectomie sus-pubienne (ouverte/robot) si très gros volumes ."
             ); n += 1
-        if anticoag or (30 <= volume_ml <= 80):
+        if anticoag or (30 <= volume_ml <= 70):
             options.append(
                 f"Option {n} : traitement chirurgical — vaporisation laser (GreenLight) en cas de risque hémorragique/anticoagulants."
             ); n += 1
         if volume_ml <= 40:
             options.append(
-                f"Option {n} : traitement mini-invasif — TUIP/ICP si petit volume (≤ 30–40 mL)."
+                f"Option {n} : traitement mini-invasif — incision cervico-prostatique si petit volume (≤ 30–40 mL)."
             ); n += 1
     elif indication_chir_stricte and (ci_chirurgie or refus_chir):
         if volume_ml > 80:
@@ -438,7 +427,7 @@ def plan_hbp(
         ); n += 1
 
     notes: List[str] = [
-        "Réévaluation après α-bloquant : 4–6 semaines (clinique, IPSS, tolérance).",
+        "Réévaluation après α-bloquant : une semaine (clinique, IPSS, tolérance).",
         "Avant toute chirurgie : réaliser un ECBU ; information et consentement indispensables.",
         "Complications chirurgicales : perop (saignement; TUR syndrome en monopolaire), précoces (RAU, hématurie/caillots, infection, TVP/EP, irritatifs), tardives (sténose urètre, sclérose du col).",
         "RTUP bipolaire/lasers : sérum physiologique (pas de glycocolle). RTUP monopolaire : glycocolle (risque de TUR syndrome).",
