@@ -315,8 +315,7 @@ def plan_hbp(
             "Orientation ADK prostatique →",
             "→ IRM prostatique multiparamétrique.",
             "→ Biopsies prostatiques ciblées ± systématiques (selon IRM/PIRADS).",
-            "→ Bilan d’extension selon risque (ex : PSMA PET-CT si disponible).",
-            "→ Discussion en RCP uro-oncologie.",
+
         ]
         notes = exp_adk
         return {"donnees": donnees, "traitement": traitement, "notes": notes}
