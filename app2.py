@@ -1095,6 +1095,7 @@ def plan_tvim(t_cat: str,
         traitement += [
             "Alternative : tri-modale (hors critères stricts) — à discuter en RCP après information du patient "
             "(viser RTUV complète si réalisable, puis chimioradiothérapie)."
+        ]    
     else:
         traitement += ["Cystectomie radicale + curage ganglionnaire (< 3 mois après le diagnostic de TVIM),type de derivation a discuter cas par cas."]
     else:
@@ -1102,6 +1103,8 @@ def plan_tvim(t_cat: str,
         traitement += [
             "Alternative : tri-modale (hors critères stricts) — à discuter en RCP après information du patient "
             "(viser RTUV complète si réalisable, puis chimioradiothérapie)."
+        ]   
+        
     # TMT selon critères
     if strict_tmt_ok:
         traitement += [
