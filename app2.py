@@ -295,7 +295,6 @@ def plan_hbp(
                     (infections_recid, "IU récidivantes"),
                     (retention, "Rétention urinaire"),
                     (calculs, "Calculs vésicaux"),
-                    (hematurie_recid, "Hématurie récidivante"),
                     (ir_post_obstacle, "Altération fonction rénale liée à l’obstacle"),
                 ]
                 if ok
@@ -350,13 +349,12 @@ def plan_hbp(
 
     # 4) PAS indication stricte → d’abord médical, puis chir (préférence partagée)
     if not indication_chir_stricte:
-        options.append(f"Option {opt_idx} : traitement médical — Alpha‑bloquant (tamsulosine/silodosine) pour LUTS modérés/sévères."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Inhibiteur de la 5‑α‑réductase (finastéride/dutastéride) si volume ≥ 40 mL ou PSA ≥ 1,5 (effet 6–12 mois)."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Association alpha‑bloquant + 5‑ARI si symptômes importants ET gros volume."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Tadalafil 5 mg/j si LUTS + dysfonction érectile."); opt_idx += 1
-        options.append(f"Option {opt_idx} : traitement médical — Antimuscarinique ou agoniste β3 si symptômes de stockage (si RPM non élevé)."); opt_idx += 1
+        options.append(f"Option {opt_idx} : traitement médical — Alpha‑bloquant (tamsulosine,Alfusozine...)."); opt_idx += 1
+        options.append(f"Option {opt_idx} : traitement médical — Inhibiteur de la 5‑α‑réductase (finastéride/dutastéride) si volume ≥ 40 mL ou PSA ≥ 1,5 (effet après 3-6 mois)."); opt_idx += 1
+        options.append(f"Option {opt_idx} : traitement médical — Association alpha‑bloquant + 5‑ARI si symptômes importants ET gros volume."); opt_idx += 1 
         if ipss <= 7:
-            options.append(f"Option {opt_idx} : mesures générales — Abstention surveillée + conseils hygiéno‑diététiques (symptômes légers)."); opt_idx += 1
+            options.append(f"Option {opt_idx} : Le patient doit être informé et rassuré sur le faible risque évolutif et le caractère bénin de sa pathologie.
+Des conseils hygiénodiététiques peuvent être donnés, notamment : la réduction des apports hydriques après 18 heures, la diminution de la consommation de caféine et d’alcool, le traitement d’une constipation associée et l’arrêt des traitements favorisant la dysurie (anticholinergiques, neuroleptiques, etc.).."); opt_idx += 1
         if ipss >= 8 and not (ci_chirurgie or refus_chir):
             if 30 <= volume_ml <= 80 or lobe_median:
                 options.append(f"Option {opt_idx} : traitement chirurgical — RTUP (mono/bipolaire), standard 30–80 mL; privilégier si lobe médian."); opt_idx += 1
