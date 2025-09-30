@@ -1050,14 +1050,14 @@ def plan_tvim(t_cat: str, cN_pos: bool, metastases: bool, cis_eligible: bool, t2
     if cis_eligible and not neo_adjuvant_fait:
         traitement += [
             "Chimiothérapie néoadjuvante à base de cisplatine (MVAC dose-dense ou GemCis).",
-            "→ Puis cystectomie radicale + curage ganglionnaire.",
+            "→ Puis cystectomie radicale + curage ganglionnaire. 10-12 semaines apres la derniere cure de chimio",
         ]
     else:
         if t2_localise and bonne_fct_v and not cis_diffus and not hydron:
             traitement += [
                 "Option tri‑modale (TMT) pour T2 sélectionné : RTUV maximale + chimioradiothérapie + surveillance.",
             ]
-        traitement += ["Cystectomie radicale + curage ganglionnaire selon extension."]
+        traitement += ["Cystectomie radicale + curage ganglionnaire < 3 mois apres le diagnostic de TVIM."]
 
     if post_op_high_risk:
         notes += [
