@@ -1050,34 +1050,29 @@ def plan_tvim(
     pdl1_pos: bool,
     post_op_high_risk: bool,
     neo_adjuvant_fait: bool,
-    # critères complémentaires pour TMT
+    # critères pour l'alternative TMT
     rtutv_complete: bool = False,
     patient_compliant: bool = False,
 ):
     """
-    Règle demandée:
-      - On propose toujours le traitement standard (chimio néoadjuvante à base de cisplatine si éligible, puis cystectomie),
-        et on AJOUTE la TMT comme **option alternative** UNIQUEMENT si TOUS les critères ci-dessous sont réunis.
-      - Si UN SEUL critère manque (ex: T4, N+, hydronephrose, etc.) → on **n'affiche pas** l'alternative TMT.
-
-    Critères TMT (doivent être tous vrais):
-      RTUTV complète
-      Stade T2–T3 (ou t2_localise = True)
-      N0 (cN_pos = False)
-      M0 (metastases = False)
-      Pas de CIS diffus (cis_diffus = False)
-      Pas d’hydronéphrose (hydron = False)
-      Bonne fonction vésicale (bonne_fct_v = True)
-      Patient informé et compliant (patient_compliant = True)
+    Alternative TMT affichée seulement si TOUS les critères sont satisfaits :
+      - RTUTV complète
+      - T2–T3 (ou t2_localise = True)
+      - N0 (cN_pos = False)
+      - M0 (metastases = False)
+      - Pas de CIS diffus
+      - Pas d’hydronéphrose
+      - Bonne fonction vésicale
+      - Patient informé et compliant
     """
     traitement, surveillance, notes = [], [], []
 
-    # Maladie métastatique : pas de TMT ni de chirurgie curative → sortir tôt
+    # Maladie métastatique : pas d'alternative TMT ni de chirurgie curative
     if metastases:
         traitement = ["Maladie métastatique → voir module dédié."]
         return {"traitement": traitement, "surveillance": surveillance, "notes": notes}
 
-    # Standard: chimio néoadjuvante si éligible, puis cystectomie
+    # Standard : chimio néoadjuvante si éligible, puis cystectomie
     if cis_eligible and not neo_adjuvant_fait:
         traitement += [
             "Chimiothérapie néoadjuvante à base de cisplatine (MVAC dose-dense ou GemCis).",
@@ -1088,37 +1083,35 @@ def plan_tvim(
             "Cystectomie radicale + curage ganglionnaire (< 3 mois après le diagnostic de TVIM)."
         ]
 
-    # Vérifier l'éligibilité stricte TMT (pour l'afficher en ALTERNATIVE)
+    # Vérification stricte de l'éligibilité à l'ALTERNATIVE TMT
     stade_ok = (t_cat.upper() in {"T2", "T3"}) or bool(t2_localise)
-    unmet = []
-    if not rtutv_complete:    unmet.append("RTUV non complète")
-    if not stade_ok:          unmet.append("stade hors T2–T3")
-    if cN_pos:                unmet.append("N+ (non N0)")
-    if metastases:            unmet.append("M1 (métastases)")
-    if cis_diffus:            unmet.append("CIS diffus")
-    if hydron:                unmet.append("hydronéphrose")
-    if not bonne_fct_v:       unmet.append("altération de la fonction vésicale")
-    if not patient_compliant: unmet.append("patient non informé/compliance insuffisante")
+    strict_tmt_ok = all([
+        bool(rtutv_complete),
+        bool(patient_compliant),
+        stade_ok,
+        not bool(cN_pos),         # N0
+        not bool(metastases),     # M0
+        not bool(cis_diffus),
+        not bool(hydron),
+        bool(bonne_fct_v),
+    ])
 
-    strict_tmt_ok = (len(unmet) == 0)
-
-    # Ajouter TMT comme ALTERNATIVE seulement si tous les critères sont réunis
+    # Ajouter l'ALTERNATIVE TMT uniquement si tous les critères sont remplis
     if strict_tmt_ok:
         traitement += [
-            "Alternative : tri-modale (RTUV complète + chimioradiothérapie + surveillance) — critères T2–T3, N0, M0, sans CIS diffus, sans hydronéphrose, bonne fonction vésicale, patient compliant."
+            "Alternative : TMT à base de RTUTV itératives + chimiothérapie et radiothérapie + surveillance, "
+            "à condition que les RTUTV soient toujours complètes et que le patient soit informé et compliant."
         ]
-    else:
-        # Rien n'est ajouté si un critère manque ; on peut documenter pourquoi
-        notes += [f"TMT non proposée (critères non remplis : {', '.join(unmet)})."]
 
-    # Contexte post-op haut risque
+    # Notes adjuvant si haut risque post-op
     if post_op_high_risk:
-        notes += ["Risque post-op élevé (pT3–4/pN+) : discuter traitement adjuvant (p.ex. immunothérapie adjuvante)."]
+        notes += ["Risque post-op élevé (pT3–4/pN+) : discuter traitement adjuvant (ex. immunothérapie adjuvante)."]
 
     # Suivi
     surveillance = ["Suivi clinique, imagerie et biologie selon protocole (tous les 3–6 mois les 2 premières années)."]
 
     return {"traitement": traitement, "surveillance": surveillance, "notes": notes}
+
 
 # =========================
 # LOGIQUE CLINIQUE — Vessie métastatique (simplifiée pour prototypage)
