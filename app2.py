@@ -1088,20 +1088,15 @@ def plan_tvim(t_cat: str,
         traitement += [
             "Chimiothérapie néoadjuvante à base de cisplatine (MVAC dose-dense ou GemCis).",
             "→ Puis cystectomie radicale + curage ganglionnaire (10–12 semaines après la dernière cure).",
+            "type de derivation a discuter cas par cas.",
         ]
     else:
-        traitement += ["Cystectomie radicale + curage ganglionnaire (< 3 mois après le diagnostic de TVIM)."]
+        traitement += ["Cystectomie radicale + curage ganglionnaire (< 3 mois après le diagnostic de TVIM),type de derivation a discuter cas par cas."]
 
     # TMT selon critères
     if strict_tmt_ok:
         traitement += [
             "Option tri-modale (critères réunis) : RTUV complète + chimioradiothérapie + surveillance rapprochée."
-        ]
-    else:
-        # Proposer systématiquement en ALTERNATIVE si critères non tous remplis
-        traitement += [
-            "Alternative : tri-modale (hors critères stricts) — à discuter en RCP après information du patient "
-            "(viser RTUV complète si réalisable, puis chimioradiothérapie)."
         ]
 
     # Notes post-op haut risque
