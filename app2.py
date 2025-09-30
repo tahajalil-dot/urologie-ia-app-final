@@ -178,8 +178,7 @@ def offer_exports(report_text: str, basename: str):
 
 
 # =========================
-# LOGIQUE CLINIQUE — HBP (TR + PSAD) — signature sans lobe_median / preservation_ejac
-# Compatible avec ANCIEN/NOUVEAU appel grâce à un adaptateur positionnel
+# LOGIQUE CLINIQUE — HBP 
 # =========================
 from typing import Optional, Any, List, Tuple, Dict, Union
 
