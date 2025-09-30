@@ -205,8 +205,20 @@ def show_protocol_image():
 
 
 # =========================
-# LOGIQUE CLINIQUE — HBP (PSAD + CAT) — v3 (algorithme demandé)
+# Helpers robustes
 # =========================
+from typing import Union, Any
+
+def _to_bool(x: Any) -> bool:
+    """Convertit proprement bool/str/int -> bool (gère 'oui/non', 'true/false', '1/0')."""
+    if isinstance(x, bool):
+        return x
+    if isinstance(x, (int, float)):
+        return x != 0
+    if isinstance(x, str):
+        s = x.strip().lower()
+        return s in {"1", "true", "vrai", "oui", "y", "yes"}
+    return bool(x)
 
 def classer_ipss(ipss: int) -> str:
     if ipss <= 7:
@@ -215,12 +227,12 @@ def classer_ipss(ipss: int) -> str:
         return "modérés"
     return "sévères"
 
-
-def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: bool):
+# =========================
+# TRIAGE ADK (TR + PSAD si 4 ≤ PSA < 10)
+# =========================
+def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: Union[bool, str, int, float]):
     """
-    TRIAGE CANCER (ADK) basé sur TR + PSAD (si 4 ≤ PSA < 10).
-    Retourne (suspect_adk: bool, explications: list[str], psad: float|None).
-
+    Retourne (suspect_adk: bool, explications: list[str], psad: float|None)
     Règles:
       - TR suspect → ADK (IRM + biopsies)
       - PSA ≥ 10 → ADK
@@ -229,13 +241,14 @@ def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: bool):
     """
     exp = []
     psad = None
+    tr_flag = _to_bool(tr_suspect)
 
-    if tr_suspect:
-        exp.append("TR suspect → orientation cancer de la prostate (IRM multiparamétrique puis biopsies).")
+    if tr_flag:
+        exp.append("TR suspect → orientation ADK (IRM multiparamétrique puis biopsies).")
         return True, exp, psad
 
     if psa_total >= 10.0:
-        exp.append("PSA ≥ 10 ng/mL → orientation cancer de la prostate (IRM puis biopsies).")
+        exp.append("PSA ≥ 10 ng/mL → orientation ADK (IRM puis biopsies).")
         return True, exp, psad
 
     if 4.0 <= psa_total < 10.0:
@@ -246,40 +259,56 @@ def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: bool):
                 exp.append("PSAD > 0,15 → critère suspect → IRM + biopsies.")
                 return True, exp, psad
             else:
-                exp.append("PSAD ≤ 0,15 → poursuite de l’analyse HBP (non suspect immédiat).")
+                exp.append("PSAD ≤ 0,15 → analyse HBP (non suspect immédiat).")
         else:
-            exp.append("PSA entre 4–10 mais volume inconnu/0 → PSAD non calculable : mesurer le volume (TRUS/IRM) pour décider.")
+            exp.append("PSA 4–10 mais volume inconnu/0 → mesurer le volume (TRUS/IRM) pour calculer la PSAD.")
 
     return False, exp, psad
 
-
+# =========================
+# Conduite à tenir HBP — algorithme demandé (sans lobe_median, sans préservation éjac)
+# =========================
 def plan_hbp(
     age: int,
     volume_ml: int,
     ipss: int,
     psa_total: float,
-    tr_suspect: bool,
-    anticoag: bool,
-    ci_chirurgie: bool,
-    refus_chir: bool,
-    infections_recid: bool,
-    retention: bool,
-    calculs: bool,
-    hematurie_recid: bool,
-    ir_post_obstacle: bool,
-    echec_medical: bool,
-    # Options pour préciser les autres médicaments (facultatifs)
-    stockage_predominant: bool = False,   # LUTS de remplissage prédominants
-    rpm_ml: int | None = None,            # Résidu post-mictionnel
-    dysfonction_erectile: bool = False,   # Pour IPDE5
+    tr_suspect: Union[bool, str, int, float],
+    anticoag: Union[bool, str, int, float],
+    ci_chirurgie: Union[bool, str, int, float],
+    refus_chir: Union[bool, str, int, float],
+    infections_recid: Union[bool, str, int, float],
+    retention: Union[bool, str, int, float],
+    calculs: Union[bool, str, int, float],
+    hematurie_recid: Union[bool, str, int, float],
+    ir_post_obstacle: Union[bool, str, int, float],
+    echec_medical: Union[bool, str, int, float],
+    # options additionnelles
+    stockage_predominant: Union[bool, str, int, float] = False,
+    rpm_ml: int | None = None,
+    dysfonction_erectile: Union[bool, str, int, float] = False,
 ):
     """
-    Retourne dict {donnees, traitement, notes} selon l'algorithme demandé:
-      - IPSS ≤ 7: Option 1 Abstention; Option 2 α-bloquant seul.
-      - IPSS > 7: Option 1 α-bloquant + réévaluation; puis autres options médicamenteuses.
-      - Si complication(s) ou échec médical: options chirurgicales selon taille prostate/état.
-      - PSA 4–10: toujours PSAD pour orienter ADK si >0,15; TR suspect → ADK.
+    Algorithme:
+      - PSA 4–10 → calcul PSAD systématique; TR suspect → ADK systématique.
+      - IPSS ≤ 7 → Option 1 Abstention ; Option 2 α-bloquant seul.
+      - IPSS > 7 → Option 1 α-bloquant + réévaluation (4–6 sem), puis autres médic.
+      - Complications et/ou échec médical → proposer chirurgie selon volume/état.
     """
+    # Normalisation des booléens
+    tr_suspect      = _to_bool(tr_suspect)
+    anticoag        = _to_bool(anticoag)
+    ci_chirurgie    = _to_bool(ci_chirurgie)
+    refus_chir      = _to_bool(refus_chir)
+    infections_recid= _to_bool(infections_recid)
+    retention       = _to_bool(retention)
+    calculs         = _to_bool(calculs)
+    hematurie_recid = _to_bool(hematurie_recid)
+    ir_post_obstacle= _to_bool(ir_post_obstacle)
+    echec_medical   = _to_bool(echec_medical)
+    stockage_predominant = _to_bool(stockage_predominant)
+    dysfonction_erectile = _to_bool(dysfonction_erectile)
+
     donnees = [
         ("Âge", f"{age} ans"),
         ("Volume prostatique", f"{volume_ml} mL"),
@@ -288,18 +317,15 @@ def plan_hbp(
         ("TR suspect", "Oui" if tr_suspect else "Non"),
         ("Anticoagulants/antiagrégants", "Oui" if anticoag else "Non"),
         ("CI/refus chirurgie", "Oui" if (ci_chirurgie or refus_chir) else "Non"),
-        (
-            "Complications",
-            ", ".join([
-                txt for ok, txt in [
-                    (infections_recid, "IU récidivantes"),
-                    (retention, "Rétention compliquée/sevrage impossible"),
-                    (calculs, "Calcul vésical"),
-                    (hematurie_recid, "Hématurie récidivante liée à l’HBP"),
-                    (ir_post_obstacle, "IR obstructive liée à l’obstacle"),
-                ] if ok
-            ]) or "Aucune",
-        ),
+        ("Complications", ", ".join([
+            txt for ok, txt in [
+                (infections_recid, "IU récidivantes"),
+                (retention, "Rétention compliquée/sevrage impossible"),
+                (calculs, "Calcul vésical"),
+                (hematurie_recid, "Hématurie récidivante liée à l’HBP"),
+                (ir_post_obstacle, "IR obstructive liée à l’obstacle"),
+            ] if ok
+        ]) or "Aucune"),
         ("Échec du traitement médical", "Oui" if echec_medical else "Non"),
         ("LUTS de remplissage prédominants", "Oui" if stockage_predominant else "Non"),
     ]
@@ -308,7 +334,7 @@ def plan_hbp(
     if dysfonction_erectile:
         donnees.append(("Dysfonction érectile associée", "Oui"))
 
-    # 0) Triage ADK
+    # 0) Triage ADK (PSAD calculée systématiquement si 4 ≤ PSA < 10)
     suspect_adk, exp_adk, psad = eval_suspicion_adk(psa_total, volume_ml, tr_suspect)
     if psad is not None:
         donnees.append(("Densité PSA (PSAD)", f"{psad:.2f}"))
@@ -316,118 +342,69 @@ def plan_hbp(
     if suspect_adk:
         traitement = [
             "Option 1 : orientation oncologique — IRM prostatique multiparamétrique.",
-            "Option 2 : orientation oncologique — Biopsies prostatiques ciblées ± systématiques selon IRM.",
+            "Option 2 : orientation oncologique — Biopsies ciblées ± systématiques selon IRM.",
         ]
-        notes = exp_adk
-        return {"donnees": donnees, "traitement": traitement, "notes": notes}
+        return {"donnees": donnees, "traitement": traitement, "notes": exp_adk}
 
-    # 1) Indication chirurgicale stricte: complication(s) OU échec médical
+    # 1) Indication chirurgicale stricte: complications OU échec médical
     complications_presentes = any([infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle])
     indication_chir_stricte = echec_medical or complications_presentes
 
     options = []
-    opt = 1
+    n = 1
 
     # 2) Pas d'indication chirurgicale stricte
     if not indication_chir_stricte:
         if ipss <= 7:
-            # EXACTEMENT 2 options
-            options.append(
-                f"Option {opt} : abstention-surveillance — informer sur l’évolution bénigne + mesures hygiéno-diététiques "
-                "(réduire apports hydriques après 18h, diminuer caféine/alcool, traiter constipation, revoir iatrogénie)."
-            ); opt += 1
-            options.append(
-                f"Option {opt} : traitement médical — α-bloquant (p.ex. tamsulosine/alfuzosine/doxazosine) en monothérapie."
-            ); opt += 1
+            options.append(f"Option {n} : abstention-surveillance — conseils hygiéno-diététiques."); n += 1
+            options.append(f"Option {n} : traitement médical — α-bloquant (monothérapie)."); n += 1
         else:
-            # IPSS > 7
-            options.append(
-                f"Option {opt} : traitement médical — α-bloquant en première intention "
-                "AVEC réévaluation clinique/IPSS à 4–6 semaines (adapter selon réponse/tolérance)."
-            ); opt += 1
-
-            # Proposer ensuite les autres options médicamenteuses
+            options.append(f"Option {n} : traitement médical — α-bloquant première intention + réévaluation à 4–6 semaines."); n += 1
+            # autres options médicamenteuses proposées ensuite
             if volume_ml > 40:
-                options.append(
-                    f"Option {opt} : traitement médical — inhibiteur de la 5-α-réductase (finastéride/dutastéride) si volume > 40 mL "
-                    "(effet en quelques mois, ↓volume ~20 %, ↓risque de RAU; PSA mesuré ≈ 50 % du réel sous traitement)."
-                ); opt += 1
-                options.append(
-                    f"Option {opt} : traitement médical — association α-bloquant + 5-ARI si monothérapie insuffisante ou symptômes marqués."
-                ); opt += 1
-
-            options.append(
-                f"Option {opt} : traitement médical — IPDE5 (tadalafil 5 mg/j), avec/sans DE; CI avec dérivés nitrés/cardiopathie non stabilisée."
-            ); opt += 1
-
+                options.append(f"Option {n} : traitement médical — inhibiteur 5-α-réductase si volume > 40 mL (effet lent, ↓RAU; penser PSA×2)."); n += 1
+                options.append(f"Option {n} : traitement médical — association α-bloquant + 5-ARI si monothérapie insuffisante."); n += 1
+            options.append(f"Option {n} : traitement médical — IPDE5 (tadalafil 5 mg/j), CI nitrés/cardiopathie non stabilisée."); n += 1
             if stockage_predominant and (rpm_ml is not None and rpm_ml < 150):
-                options.append(
-                    f"Option {opt} : traitement médical — anticholinergique si LUTS de remplissage prédominants et RPM < 150 mL "
-                    "(plutôt en ajout si persistance sous α-bloquant)."
-                ); opt += 1
+                options.append(f"Option {n} : traitement médical — anticholinergique si LUTS de remplissage prédominants et RPM < 150 mL."); n += 1
+            options.append(f"Option {n} : alternative — phytothérapie (efficacité modeste, bonne tolérance)."); n += 1
 
-            options.append(
-                f"Option {opt} : alternative — phytothérapie (Serenoa repens/Pygeum africanum) : efficacité modeste, bonne tolérance."
-            ); opt += 1
-
-    # 3) Indication chirurgicale stricte (complications/échec) ET chirurgie faisable
+    # 3) Indication chirurgicale stricte ET chirurgie faisable
     if indication_chir_stricte and not (ci_chirurgie or refus_chir):
         if 30 <= volume_ml <= 80:
-            options.append(
-                f"Option {opt} : traitement chirurgical — RTUP (mono/bipolaire) ou vaporisation endoscopique (laser/bipolaire) pour 30–80 mL."
-            ); opt += 1
+            options.append(f"Option {n} : traitement chirurgical — RTUP (mono/bipolaire) ou vaporisation endoscopique pour 30–80 mL."); n += 1
         if volume_ml >= 60:
-            options.append(
-                f"Option {opt} : traitement chirurgical — énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour ≥ 60–100+ mL."
-            ); opt += 1
+            options.append(f"Option {n} : traitement chirurgical — énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour ≥ 60–100+ mL."); n += 1
         if anticoag or (30 <= volume_ml <= 80):
-            options.append(
-                f"Option {opt} : traitement chirurgical — vaporisation laser (GreenLight) si risque hémorragique/anticoagulants."
-            ); opt += 1
+            options.append(f"Option {n} : traitement chirurgical — vaporisation laser (GreenLight) si risque hémorragique/anticoagulants."); n += 1
         if volume_ml > 100:
-            options.append(
-                f"Option {opt} : traitement chirurgical — adénomectomie sus-pubienne (ouverte/robot) si très gros volumes "
-                "ou si plateau d’énucléation indisponible."
-            ); opt += 1
-
-        # Option mini-invasif utile (sans entrer dans les détails de lobe médian)
+            options.append(f"Option {n} : traitement chirurgical — adénomectomie sus-pubienne (ouverte/robot) si très gros volumes."); n += 1
         if volume_ml <= 40:
-            options.append(
-                f"Option {opt} : traitement mini-invasif — incision cervico-prostatique (TUIP/ICP) si petit volume (≤ 30–40 mL)."
-            ); opt += 1
+            options.append(f"Option {n} : traitement mini-invasif — TUIP/ICP si petit volume (≤ 30–40 mL)."); n += 1
 
-    # 4) Indication chirurgicale stricte MAIS chirurgie impossible (CI/refus)
+    # 4) Indication chirurgicale stricte MAIS CI/refus
     if indication_chir_stricte and (ci_chirurgie or refus_chir):
         if volume_ml > 80:
-            options.append(
-                f"Option {opt} : alternative — embolisation des artères prostatiques (discussion RCP) pour gros volumes."
-            ); opt += 1
-        options.append(
-            f"Option {opt} : palliatif — auto-sondages intermittents, ou sonde à demeure / cathéter sus-pubien selon contexte."
-        ); opt += 1
+            options.append(f"Option {n} : alternative — embolisation des artères prostatiques (discussion RCP)."); n += 1
+        options.append(f"Option {n} : palliatif — autosondages intermittents ou sonde à demeure / cathéter sus-pubien."); n += 1
 
-    # Notes
-    notes = []
-    if anticoag:
-        notes.append("Anticoagulants/antiagrégants → privilégier laser/GreenLight/HoLEP (meilleure hémostase).")
-    notes.append("Réévaluation après α-bloquant: 4–6 semaines (clinique, IPSS, tolérance).")
-    notes.append("Avant toute chirurgie: réaliser un ECBU.")
-    notes.append("RTUP bipolaire/lasers: sérum physiologique (pas de glycocolle). RTUP monopolaire: glycocolle → risque de TUR syndrome.")
+    notes = [
+        "Réévaluation après α-bloquant: 4–6 semaines (clinique, IPSS, tolérance).",
+        "Avant toute chirurgie: réaliser un ECBU.",
+        "RTUP bipolaire/lasers: sérum physiologique; RTUP monopolaire: glycocolle (risque TUR syndrome).",
+    ]
     if 4.0 <= psa_total < 10.0 and (not volume_ml or volume_ml <= 0):
-        notes.append("PSA 4–10: mesurer le volume prostatique (TRUS/IRM) pour calculer la PSAD et statuer sur l’orientation ADK.")
+        notes.append("PSA 4–10: mesurer le volume (TRUS/IRM) pour calculer la PSAD et statuer sur l’orientation ADK.")
 
     return {"donnees": donnees, "traitement": options, "notes": notes}
 
-
-# --- (Optionnel) Shim de compatibilité si ton ancien code passe encore lobe_median/preservation_ejac ---
+# (Optionnel) Compat: si ton ancien appel envoie encore 'lobe_median' ou 'preservation_ejac',
+# on les ignore silencieusement pour éviter un crash.
 def plan_hbp_compat(*args, **kwargs):
-    """
-    Compatibilité: ignore les anciens paramètres 'lobe_median' et 'preservation_ejac' s'ils sont fournis.
-    Utilise plan_hbp() v3.
-    """
     kwargs.pop("lobe_median", None)
     kwargs.pop("preservation_ejac", None)
     return plan_hbp(*args, **kwargs)
+
 
 
 # =========================
