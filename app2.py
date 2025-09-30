@@ -1003,34 +1003,34 @@ def plan_tvnim(risque: str):
     if risque == "faible":
         traitement = [
             "RTUV complète.",
-            "Instillation postopératoire précoce de chimio intravésicale (ex. MMC) si non contre-indiquée.",
+            " il est recommandé de réaliser une instillation postopératoire précoce (IPOP) . Aucun autre traitement complémentaire n’est nécessaire. Une surveillance simple selon le schéma proposé  est nécessaire pour une durée totale de 5 ans.",
         ]
         suivi = [
-            "Cystoscopie à 3 mois, puis rythme allégé si négatif (ex : 9–12 mois, puis annuel).",
-            "Cytologie selon contexte.",
+            "3e et 12e mois Puis 1×/an pendant 5 ans .",
+            
         ]
     elif risque == "intermédiaire":
         traitement = [
             "RTUV complète.",
-            "Induction intravésicale (BCG OU chimio) puis maintenance ~1 an (à adapter).",
+            "instillations endovésicales par chimiothérapie (mitomycine, épirubicine, gemcitabine) selon un schéma de 6-8 instillations d’induction+ traitement d’entretien peut être discuté pour les patients les plus à risque de récidive. Une alternative thérapeutique est la BCG-thérapie avec un entretien de 1 an  pour diminuer le risque de récidive.",
         ]
-        suivi = ["Cysto + cytologie à 3, 6, 12 mois, puis semestriel/annuel."]
+        suivi = ["3e et 6e mois puis tous les 6 mois pendant 2 ans Puis 1×/an , + cytologie urinaire."]
         protocoles = ["BCG : induction (6 instillations) + maintenance (~1 an)."]
     else:  # élevé
         traitement = [
-            "RTUV complète avec re‑résection (second look) si T1 haut grade.",
-            "BCG : induction + maintenance prolongée (1–3 ans selon dispo/tolérance).",
-            "Discuter cystectomie précoce si T1 haut grade avec facteurs défavorables.",
+            "RTUV complète avec re‑résection (second look) .",
+            "BCG : induction 6 seances  + entretien prolongée (3 ans selon dispo/tolérance).",
+            "Discuter cystectomie précoce si T1 haut grade avec facteurs défavorables ( très haut risque).",
         ]
         suivi = [
-            "Cysto + cytologie rapprochées (ex : 3/6/9/12 mois, puis trimestriel/semestre).",
+            "Cysto + cytologie rapprochées (ex3e et 6e mois puis tous les 3 mois pendant 2 ans puis tous les 6 mois jusqu’à 5 ans puis 1×/an a vie ).",
             "Imagerie selon facteurs/symptômes.",
         ]
         protocoles = ["BCG : induction (6) + maintenance prolongée."]
         notes = ["Second look recommandé si T1 haut grade (2–6 semaines)."]
 
     notes_second_look = notes or [
-        "Second look : à envisager si résection incomplète ou doute sur le stade."
+        "Second look : à envisager si résection incomplète ou doute sur le stade, ou muscle non vue a l'anapath;."
     ]
     return traitement, suivi, protocoles, notes_second_look
 
