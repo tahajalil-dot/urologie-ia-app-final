@@ -2643,44 +2643,13 @@ def render_kidney_meta_page():
 def render_kidney_biopsy_page():
     btn_home_and_back(show_back=True, back_label="Tumeur du rein")
     st.header("🔷 Rein — Indications de biopsie percutanée")
-    with st.form("kidney_biopsy_form"):
-        indication_systemique = st.radio("Projet de traitement systémique (métastatique) nécessitant confirmation histo ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        indication_ablation = st.radio("Traitement focal (cryo/RFA) envisagé ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        inoperable_haut_risque = st.radio("Patient inopérable/haut risque chirurgical ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        lesion_indet = st.radio("Lésion indéterminée en imagerie (diagnostic incertain) ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        suspicion_lymphome_metastase_infection = st.radio("Suspicion lymphome / métastase d’un primitif / infection ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        rein_unique_ou_ckd = st.radio("Rein unique ou CKD significative ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        petite_masse_typique_et_chirurgie_prevue = st.radio("Petite masse solide typique (T1) et chirurgie conservatrice déjà prévue chez patient apte ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        bosniak = st.selectbox("Si lésion kystique : classification Bosniak", ["Non applicable", "II", "IIF", "III", "IV"])
-        troubles_coag_non_corriges = st.radio("Troubles de coagulation non corrigés ?", ["Non", "Oui"], horizontal=True) == "Oui"
-
-        submitted = st.form_submit_button("🔎 Générer la conduite — Biopsie")
-    if submitted:
-        plan = plan_rein_biopsy(
-            indication_systemique, indication_ablation, inoperable_haut_risque,
-            lesion_indet, suspicion_lymphome_metastase_infection, rein_unique_ou_ckd,
-            petite_masse_typique_et_chirurgie_prevue, bosniak, troubles_coag_non_corriges
-        )
-        render_kv_table("🧾 Données saisies", plan["donnees"])
-        st.markdown("### 🧭 Conduite proposée")
-        for x in plan["conduite"]:
-            st.markdown("- " + x)
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["suivi"]:
-            st.markdown("- " + x)
-        if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]:
-                st.markdown("- " + x)
-
-        sections = {
-            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
-            "Conduite": plan["conduite"],
-            "Modalités de suivi": plan["suivi"],
-            "Notes": plan["notes"],
-        }
-        report_text = build_report_text("Conduite — Biopsie rénale", sections)
-        st.markdown("### 📤 Export"); offer_exports(report_text, "Conduite_Biopsie_Renale")
+    st.markdown("Les indications suivantes s’appliquent :")
+    st.markdown("- **Avant un traitement médical** en l’absence de diagnostic histologique ;")
+    st.markdown("- **Avant un traitement focal** (radiofréquence, curiethérapie ou radiothérapie) ;")
+    st.markdown("- **Avant une néphrectomie élargie** pour tumeur localisée si la néphrectomie partielle est jugée non réalisable (**cT1, cT2**) ;")
+    st.markdown("- **Avant une néphrectomie partielle** pour tumeur de complexité chirurgicale élevée et risque de totalisation ;")
+    st.markdown("- **En cas d’indication impérative**, de rein unique et de tumeurs bilatérales ;")
+    st.markdown("- **En cas d’incertitude diagnostique** (lymphome, métastase d’un autre cancer, carcinome urothélial, sarcome).")
 
 
 # =========================
