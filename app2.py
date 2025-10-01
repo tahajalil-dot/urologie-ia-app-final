@@ -2784,14 +2784,14 @@ def render_home_wrapper():
         with (col1 if i % 2 == 0 else col2):
             category_button(mod, PALETTE[mod], key=f"btn_{i}")
 
-
 def render_generic(page_label: str):
     btn_home_and_back()
     st.header(page_label)
     st.info("Module en cours de construction.")
 
+# Fallback sûr si la clé n'existe pas encore
+page = st.session_state.get("page", "Accueil")
 
-page = st.session_state["page"]
 if page == "Accueil":
     render_home_wrapper()
 elif page == "Tumeur de la vessie":
@@ -2825,11 +2825,10 @@ elif page == "IU: Cystite":
 elif page == "IU: PNA":
     render_infectio_pna_page()
 elif page == "IU: Prostatite":
-    render_infectio_homme_page() 
-elif page == "Lithiase":
-    render_lithiase_page()
+    render_infectio_homme_page()
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
-       render_plan_hbp_core()
+    # 👉 corrige l'appel : on rend la page UI HBP, pas la logique interne
+    render_hbp_page()
 elif page == "Tumeur de la prostate":
     render_prostate_menu()
 elif page == "Prostate: Localisée":
