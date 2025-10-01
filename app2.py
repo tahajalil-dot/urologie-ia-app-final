@@ -672,13 +672,14 @@ def plan_prostate_metastatique(testosterone_castration: bool,
     return {"profil": profil, "options": options, "adjoints": adjoints, "notes": notes}
 
 # =========================
-# LOGIQUE CLINIQUE — REIN (localisé, métastatique, biopsie) — conduites corrigées
+# LOGIQUE CLINIQUE — REIN (localisé, métastatique, biopsie)
 # =========================
+
+from typing import List, Tuple, Dict
 
 def plan_rein_local(
     cT: str,
     cN_pos: bool,
-    size_cm: float,
     thrombus: str,  # "Aucun", "Veine rénale", "VCC infra-hépatique", "VCC supra-hépatique/atrium"
     rein_unique_ou_CKD: bool,
     tumeur_hilaire: bool,
@@ -688,15 +689,12 @@ def plan_rein_local(
     biopsie_dispo: bool,
 ):
     """
-    Retourne dict {donnees, traitement, suivi, notes} avec options numérotées,
-    aligné sur les conduites détaillées (NP référence T1a, alternatives TA/SBRT/SA,
-    choix NP/NT pour >4 cm, prise en charge T3–T4 et thrombus cave, curage/surrénale,
-    et adjuvant pembrolizumab).
+    Retourne dict {donnees, traitement, suivi, notes} avec options numérotées.
+    NOTE: aucune taille en cm; les décisions se basent sur le stade cT.
     """
     donnees = [
         ("cT", cT),
         ("cN+", "Oui" if cN_pos else "Non"),
-        ("Taille", f"{size_cm:.1f} cm"),
         ("Thrombus", thrombus),
         ("Rein unique/CKD", "Oui" if rein_unique_ou_CKD else "Non"),
         ("Tumeur hilaire/centrale", "Oui" if tumeur_hilaire else "Non"),
@@ -706,73 +704,289 @@ def plan_rein_local(
         ("Biopsie disponible", "Oui" if biopsie_dispo else "Non"),
     ]
 
-    options = []
-    notes = []
+    options: List[str] = []
     idx = 1
+    notes: List[str] = []
 
-    # Rappels généraux utiles
     if not biopsie_dispo:
-        notes.append("Biopsie à discuter si traitement focal (cryo/RFA) ou surveillance active envisagés, doute diagnostique, ou avant traitement systémique.")
+        notes.append("Biopsie à discuter si traitement focal/surveillance prévue, doute diagnostique, ou avant traitement systémique.")
 
-    # ===== Décision par stade (synthèse détaillée) =====
-    if cT == "T1a":  # ≤ 4 cm
-        # Référence
-        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle (référence pour ≤4 cm)."); idx += 1
-        # TA (nécessite biopsie préalable) si anatomie favorable / patient fragile
-        if size_cm <= 4.0 and exophytique:
-            label_ta = "Cryoablation ou RFA percutanée (lésion ≤3–4 cm, exophytique/postérieure, patient fragile ou préférence)."
-            if not biopsie_dispo:
-                label_ta += " (⚠ biopsie préalable recommandée avant TA)"
-            options.append(f"Option {idx} : traitement focal — {label_ta}"); idx += 1
-        # SBRT inopérables/haut risque (dose usuelle <4 cm)
-        if haut_risque_op:
-            options.append(f"Option {idx} : radiothérapie stéréotaxique ablative — inopérable/haut risque (≈25–26 Gy en 1 fraction pour <4 cm)."); idx += 1
-        # Surveillance active (scénario privilégié petites tumeurs <2 cm, patients âgés/comorbides)
-        options.append(f"Option {idx} : surveillance active — Imagerie 3–6 mois puis 6–12 mois; déclencheurs = croissance >0,5 cm/an, symptômes, taille >4 cm."); idx += 1
-        # NT si NP non faisable (complexité/hilaire) ou rein non fonctionnel
-        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale si NP non faisable en sécurité ou rein non fonctionnel."); idx += 1
+    # Décision par stade
+    if cT == "T1a":  # ≤ 4 cm (catégorisé par le stade)
+        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle (standard)."); idx += 1
+        if exophytique:
+            options.append(f"Option {idx} : traitement focal — Cryoablation/RFA percutanée (lésion exophytique, plateau adapté, patient fragile)."); idx += 1
+        options.append(f"Option {idx} : surveillance active — Imagerie à 3–6 mois puis 6–12 mois; déclencheurs = croissance rapide, symptômes, haut grade confirmé."); idx += 1
+        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale si NP non faisable (anatomie/hilaire) ou rein non fonctionnel."); idx += 1
 
-    elif cT == "T1b":  # 4–7 cm
+    elif cT == "T1b":  # >4 à ≤7 cm
         if rein_unique_ou_CKD:
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle *impérative* (centre expert) pour préserver la fonction rénale."); idx += 1
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale si NP réellement impossible."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle en centre expert (préservation rénale prioritaire)."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale si NP non faisable."); idx += 1
         else:
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle si faisable (centre expert) OU Néphrectomie totale selon complexité (hilaire/endophytique → plutôt NT)."); idx += 1
-        options.append(f"Option {idx} : surveillance — Réservée aux inopérables/fragilité majeure (RCP, soins de support)."); idx += 1
-        # SBRT chez inopérables/haut risque (preuves plus limitées que T1a)
-        if haut_risque_op:
-            options.append(f"Option {idx} : radiothérapie stéréotaxique ablative — option chez inopérables (schémas usuels 35–45 Gy/3 fx ou 40–50 Gy/5 fx)."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle (sélectionnée) OU Néphrectomie totale selon complexité (hilaire/endophytique → plutôt NT)."); idx += 1
+        options.append(f"Option {idx} : surveillance active — Uniquement si comorbidités majeures/inopérable (RCP)."); idx += 1
 
-    elif cT in ("T2a", "T2b"):
+    elif cT in ("T2a", "T2b"):  # >7 à ≤10 cm ; >10 cm
         if rein_unique_ou_CKD:
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle *impérative* en centre expert si techniquement faisable; sinon Néphrectomie totale."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle *impérative* (centre expert) OU Néphrectomie totale si NP impossible."); idx += 1
         else:
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale (standard pour >4 cm)."); idx += 1
-        options.append(f"Option {idx} : surveillance — Uniquement si inopérable/fragilité majeure (RCP)."); idx += 1
-        # SBRT possible chez inopérables sélectionnés (données encore limitées)
-        if haut_risque_op:
-            options.append(f"Option {idx} : radiothérapie stéréotaxique ablative — inopérables, à discuter (données limitées en électif)."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale (standard)."); idx += 1
+        options.append(f"Option {idx} : surveillance — seulement si inopérable/fragilité majeure (RCP, soins de support)."); idx += 1
 
     elif cT == "T3a":
-        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale avec exérèse de la graisse péri-rénale ± veine rénale si envahie."); idx += 1
+        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale avec exérèse graisse péri-rénale ± veine rénale (si envahie)."); idx += 1
         if rein_unique_ou_CKD:
-            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle *impérative* si anatomie favorable (centre expert)."); idx += 1
+            options.append(f"Option {idx} : traitement chirurgical — Néphrectomie partielle *impérative* (centre expert) si anatomie favorable."); idx += 1
 
     elif cT in ("T3b", "T3c"):
-        # Préciser niveau de thrombus
-        niveau = thrombus if thrombus in ("VCC infra-hépatique", "VCC supra-hépatique/atrium") else "VCC (niveau à préciser)"
-        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale + thrombectomie (niveau {niveau}); équipe vasculaire/cardiothoracique si nécessaire."); idx += 1
-        options.append(f"Option {idx} : stratégie — Discussion RCP spécialisée (évaluation opérabilité vs traitement systémique d’emblée)."); idx += 1
-        notes.append("Thrombus cave : imagerie de contrôle 24–48 h préop (niveau du thrombus) et bilan hépatique; chirurgie pluridisciplinaire, voie ouverte privilégiée.")
+        options.append(f"Option {idx} : traitement chirurgical — Néphrectomie totale + thrombectomie (niveau {thrombus}). Équipe vasculaire/cardiothoracique si VCC."); idx += 1
+        options.append(f"Option {idx} : stratégie — Discussion RCP spécialisée (opérabilité vs traitement systémique d’emblée)."); idx += 1
 
     elif cT == "T4":
-        options.append(f"Option {idx} : traitement chirurgical — Résection élargie si résécable (objectif marges négatives)."); idx += 1
-        options.append(f"Option {idx} : stratégie — Traitement systémique d’emblée si non résécable (RCP)."); idx += 1
+        options.append(f"Option {idx} : traitement chirurgical — Résection élargie si résécable (RCP de recours)."); idx += 1
+        options.append(f"Option {idx} : stratégie — Traitement systémique d’emblée si non résécable."); idx += 1
 
+    # Ganglions
+    if cN_pos:
+        notes.append("Curage ganglionnaire ciblé si adénopathies cliniquement envahies; curage étendu systématique non recommandé.")
+
+    # Adjuvant
+    notes.append("Adjuvant : pembrolizumab 12 mois à discuter chez ccRCC à haut risque (profils type KEYNOTE-564).")
+
+    # Haut risque opératoire — rappel d’orientation
+    if haut_risque_op:
+        notes.append("Haut risque opératoire : privilégier prise en charge mini-invasive si éligible (TA) ou surveillance selon stade/comorbidités, en RCP.")
+
+    # Suivi post-traitement
+    suivi: List[str] = []
+    if cT == "T1a" and not cN_pos:
+        suivi += [
+            "Consultation : 3–6 mois post-op, puis 12 mois, puis annuel jusqu’à 5 ans.",
+            "Imagerie : TDM/IRM abdo ± TDM thorax à 12 mois puis annuel.",
+            "Biologie : créat/DFG à chaque visite; PA; +/- Hb/Ca selon contexte.",
+        ]
+    elif cT in ("T1b", "T2a", "T2b") and not cN_pos:
+        suivi += [
+            "Consultation : tous les 6–12 mois pendant 3 ans, puis annuel jusqu’à 5 ans.",
+            "Imagerie : TDM abdo + TDM thorax tous les 6–12 mois (3 ans), puis annuel.",
+            "Biologie : créat/DFG, +/- Hb/Ca; adapter si rein unique/CKD.",
+        ]
+    else:  # T3/T4 ou N+
+        suivi += [
+            "Consultation : tous les 3–6 mois pendant 3 ans, puis 6–12 mois jusqu’à 5 ans.",
+            "Imagerie : TDM TAP tous les 3–6 mois (3 ans), puis 6–12 mois.",
+            "Biologie : créat/DFG, Hb, Ca; symptômes ciblés. IRM cérébrale si clinique.",
+        ]
+
+    return {"donnees": donnees, "traitement": options, "suivi": suivi, "notes": notes}
+
+
+# ——— inchangé ci-dessous ———
+
+def calc_imdc(
+    karnofsky_lt80: bool,
+    time_to_systemic_le_12mo: bool,
+    hb_basse: bool,
+    calcium_haut: bool,
+    neutro_hauts: bool,
+    plaquettes_hautes: bool,
+):
+    """Heng/IMDC : 6 facteurs (KPS<80, délai<1 an, Hb basse, Ca haut, neutros hautes, plaquettes hautes)."""
+    score = sum([karnofsky_lt80, time_to_systemic_le_12mo, hb_basse, calcium_haut, neutro_hauts, plaquettes_hautes])
+    if score == 0:
+        groupe = "Bon pronostic (0)"
+    elif score in (1, 2):
+        groupe = "Intermédiaire (1–2)"
     else:
-        options.append(f"Option {idx} : Vérifier/standardiser le stade clinique cT (valeur reçue: '{cT}') et re-générer les options."); idx += 1
+        groupe = "Mauvais (≥3)"
+    return score, groupe
 
-    # ===== Éléments transversaux (ganglions,
+
+def calc_mskcc(
+    karnofsky_lt80: bool,
+    time_to_systemic_le_12mo: bool,
+    hb_basse: bool,
+    calcium_haut: bool,
+    ldh_haut: bool,
+):
+    """MSKCC/Motzer : 5 facteurs (KPS<80, délai<1 an, Hb basse, Ca haut, LDH élevé)."""
+    score = sum([karnofsky_lt80, time_to_systemic_le_12mo, hb_basse, calcium_haut, ldh_haut])
+    if score == 0:
+        groupe = "Bon pronostic (0)"
+    elif score in (1, 2):
+        groupe = "Intermédiaire (1–2)"
+    else:
+        groupe = "Mauvais (≥3)"
+    return score, groupe
+
+
+def plan_rein_meta(
+    histo: str,             # "ccRCC" ou "non-ccRCC"
+    score: int,
+    group: str,
+    score_system_label: str,
+    oligo: bool,
+    bone: bool,
+    brain: bool,
+    liver: bool,
+    io_contra: bool,
+):
+    """
+    Retourne dict {donnees, stratification, traitement, suivi, notes}.
+    Inclut la néphrectomie de cytoréduction comme option selon IMDC/MSKCC et charge tumorale.
+    """
+    donnees = [
+        ("Histologie", histo),
+        (f"{score_system_label} score", str(score)),
+        (f"Groupe {score_system_label}", group),
+        ("Oligométastatique", "Oui" if oligo else "Non"),
+        ("Métastases osseuses", "Oui" if bone else "Non"),
+        ("Cérébrales", "Oui" if brain else "Non"),
+        ("Hépatiques", "Oui" if liver else "Non"),
+        ("CI immunothérapie", "Oui" if io_contra else "Non"),
+    ]
+
+    options: List[str] = []
+    idx = 1
+    notes: List[str] = []
+
+    # Cytoréduction
+    if "Bon" in group and oligo:
+        options.append(f"Option {idx} : néphrectomie de cytoréduction **immédiate** (bon pronostic, tumeur rénale dominante, faible charge)."); idx += 1
+    elif "Intermédiaire" in group or "Mauvais" in group:
+        options.append(f"Option {idx} : néphrectomie de cytoréduction **différée** après réponse au traitement systémique (sélectionnés)."); idx += 1
+
+    # 1re ligne
+    if histo == "ccRCC":
+        if "Bon" in group:
+            if not io_contra:
+                options.append(f"Option {idx} : 1re ligne — Pembrolizumab + Axitinib."); idx += 1
+                options.append(f"Option {idx} : 1re ligne — Pembrolizumab + Lenvatinib."); idx += 1
+                options.append(f"Option {idx} : 1re ligne — Nivolumab + Cabozantinib."); idx += 1
+                options.append(f"Option {idx} : stratégie — Surveillance rapprochée (maladie indolente, faible charge)."); idx += 1
+            options.append(f"Option {idx} : 1re ligne — TKI seul (Axitinib, Pazopanib, Sunitinib, Tivozanib) si CI à l’immunothérapie."); idx += 1
+        else:
+            if not io_contra:
+                options.append(f"Option {idx} : 1re ligne — Nivolumab + Ipilimumab."); idx += 1
+                options.append(f"Option {idx} : 1re ligne — Pembrolizumab + Lenvatinib."); idx += 1
+                options.append(f"Option {idx} : 1re ligne — Nivolumab + Cabozantinib."); idx += 1
+                options.append(f"Option {idx} : 1re ligne — Pembrolizumab + Axitinib."); idx += 1
+            options.append(f"Option {idx} : 1re ligne — TKI seul (Cabozantinib, Axitinib, Sunitinib, Tivozanib) si CI à l’immunothérapie."); idx += 1
+    else:
+        options.append(f"Option {idx} : 1re ligne — Cabozantinib (préférence papillaire)."); idx += 1
+        options.append(f"Option {idx} : 1re ligne — Pembrolizumab + Lenvatinib."); idx += 1
+        options.append(f"Option {idx} : 1re ligne — Sunitinib ou Pazopanib."); idx += 1
+        options.append(f"Option {idx} : 1re ligne — Lenvatinib + Everolimus (sélectionné)."); idx += 1
+        options.append(f"Option {idx} : chimiothérapie — Gemcitabine + (Cisplatine/Carboplatine) pour sous-types agressifs."); idx += 1
+        options.append(f"Option {idx} : stratégie — Essai clinique si disponible."); idx += 1
+
+    # 2e ligne
+    if histo == "ccRCC":
+        options.append(f"Option {idx} : 2e ligne — Cabozantinib."); idx += 1
+        options.append(f"Option {idx} : 2e ligne — Lenvatinib + Everolimus."); idx += 1
+        options.append(f"Option {idx} : 2e ligne — Tivozanib."); idx += 1
+        options.append(f"Option {idx} : 2e ligne — Belzutifan (si disponible)."); idx += 1
+    else:
+        options.append(f"Option {idx} : 2e ligne — Cabozantinib / Lenvatinib + Everolimus."); idx += 1
+        options.append(f"Option {idx} : 2e ligne — Essai clinique fortement recommandé."); idx += 1
+
+    # Sites spéciaux
+    if oligo:
+        notes.append("Maladie oligométastatique : à discuter métastasectomie et/ou radiothérapie stéréotaxique.")
+    if bone:
+        notes.append("Os : acide zolédronique ou denosumab + Ca/Vit D; radiothérapie antalgique si douloureux.")
+    if brain:
+        notes.append("Cerveau : stéréotaxie/chirurgie + stéroïdes selon symptômes; coordination neuro-oncologie.")
+
+    # Suivi métastatique
+    suivi = [
+        "Avant et pendant traitement : PA/poids, symptômes; NFS, créat/DFG, transaminases, phosphatases, Ca; TSH (IO/TKI).",
+        "Protéinurie et TA à chaque visite sous TKI; ECG/risques CV si nécessaire.",
+        "Imagerie de réévaluation : TDM TAP toutes 8–12 semaines les 6–9 premiers mois, puis espacer selon réponse/clinique.",
+        "IRM cérébrale si symptômes ou lésions traitées (toutes 8–12 semaines au début).",
+    ]
+
+    return {
+        "donnees": donnees,
+        "stratification": [(score_system_label, f"{group} (score {score})")],
+        "traitement": options,
+        "suivi": suivi,
+        "notes": notes,
+    }
+
+
+def plan_rein_biopsy(
+    indication_systemique: bool,
+    indication_ablation: bool,
+    inoperable_haut_risque: bool,
+    lesion_indet: bool,
+    suspicion_lymphome_metastase_infection: bool,
+    rein_unique_ou_ckd: bool,
+    petite_masse_typique_et_chirurgie_prevue: bool,
+    bosniak: str,  # "II", "IIF", "III", "IV", "Non applicable"
+    troubles_coag_non_corriges: bool,
+):
+    """
+    Retourne dict {donnees, conduite, suivi, notes} pour les indications de biopsie percutanée d'une masse rénale.
+    """
+    donnees = [
+        ("Avant traitement systémique (métastatique)", "Oui" if indication_systemique else "Non"),
+        ("Avant traitement focal (cryo/RFA) prévu", "Oui" if indication_ablation else "Non"),
+        ("Patient inopérable/haut risque chirurgical", "Oui" if inoperable_haut_risque else "Non"),
+        ("Lésion indéterminée en imagerie", "Oui" if lesion_indet else "Non"),
+        ("Suspicion lymphome / métastase / infection", "Oui" if suspicion_lymphome_metastase_infection else "Non"),
+        ("Rein unique / CKD significative", "Oui" if rein_unique_ou_ckd else "Non"),
+        ("Petite masse typique et chirurgie déjà prévue", "Oui" if petite_masse_typique_et_chirurgie_prevue else "Non"),
+        ("Bosniak (si kystique)", bosniak),
+        ("Troubles de coagulation non corrigés", "Oui" if troubles_coag_non_corriges else "Non"),
+    ]
+
+    options: List[str] = []
+    idx = 1
+    notes: List[str] = []
+
+    # CI immédiate
+    if troubles_coag_non_corriges:
+        options.append(f"Option {idx} : corriger les troubles de coagulation **avant** toute biopsie; sinon différer."); idx += 1
+
+    # Indications fortes
+    indications_fortes = any([
+        indication_systemique,
+        indication_ablation,
+        inoperable_haut_risque,
+        lesion_indet,
+        suspicion_lymphome_metastase_infection,
+        rein_unique_ou_ckd,
+    ])
+
+    # Non nécessaire d’emblée
+    non_necessaire = petite_masse_typique_et_chirurgie_prevue and not indications_fortes
+
+    # Bosniak
+    if bosniak in ("III", "IV"):
+        notes.append("Kystique Bosniak III/IV : la biopsie peut avoir un rendement limité; décision RCP (biopsie vs chirurgie d’emblée).")
+
+    if indications_fortes:
+        options.append(f"Option {idx} : Biopsie rénale percutanée guidée (TDM/écho), 2–3 carottes, histo + IHC si besoin."); idx += 1
+    elif not indications_fortes and not non_necessaire:
+        options.append(f"Option {idx} : Discussion RCP — Biopsie **ou** surveillance/traitement selon préférences et risque."); idx += 1
+    else:
+        options.append(f"Option {idx} : Pas d’indication routinière à la biopsie si chirurgie partielle déjà prévue chez patient apte (petite masse solide typique)."); idx += 1
+
+    # Suivi
+    suivi = [
+        "Après biopsie : surveillance du point de ponction, contrôle Hb si risque saignement.",
+        "Si surveillance active choisie : imagerie à 3–6 mois puis tous les 6–12 mois; re-biopsie si évolution atypique.",
+        "Si ablation après biopsie : TDM/IRM à 3 mois, puis 6–12 mois les 2 premières années.",
+    ]
+
+    notes += [
+        "CI relatives : infection cutanée au point de ponction, impossibilité de coopération/apnée, anticoagulation non interrompue.",
+        "Informer sur rendements : meilleurs pour masses solides; plus limité pour kystiques complexes.",
+    ]
+
+    return {"donnees": donnees, "conduite": options, "suivi": suivi, "notes": notes}
 
 # =========================
 # LOGIQUE CLINIQUE — TVNIM (simplifiée pour prototypage)
@@ -2273,7 +2487,7 @@ def render_lithiase_page():
 
 
 # -------------------------
-# HBP (UI)
+# cancer du rein  (UI)
 # -------------------------
 def render_kidney_menu():
     btn_home_and_back()
@@ -2291,10 +2505,34 @@ def render_kidney_menu():
 def render_kidney_local_page():
     btn_home_and_back(show_back=True, back_label="Tumeur du rein")
     st.header("🔷 Rein — tumeur non métastatique")
+
+    # Mapping libellé → cT
+    ct_labels = [
+        "Localisé — T1a (≤ 4 cm)",
+        "Localisé — T1b (> 4 à ≤ 7 cm)",
+        "Localisé — T2a (> 7 à ≤ 10 cm)",
+        "Localisé — T2b (> 10 cm)",
+        "Localement avancé — T3a",
+        "Localement avancé — T3b",
+        "Localement avancé — T3c",
+        "Localement avancé — T4",
+    ]
+    ct_map = {
+        "Localisé — T1a (≤ 4 cm)": "T1a",
+        "Localisé — T1b (> 4 à ≤ 7 cm)": "T1b",
+        "Localisé — T2a (> 7 à ≤ 10 cm)": "T2a",
+        "Localisé — T2b (> 10 cm)": "T2b",
+        "Localement avancé — T3a": "T3a",
+        "Localement avancé — T3b": "T3b",
+        "Localement avancé — T3c": "T3c",
+        "Localement avancé — T4": "T4",
+    }
+
     with st.form("kidney_local_form"):
-        cT = st.selectbox("Stade cT (TNM 2017)", ["T1a", "T1b", "T2a", "T2b", "T3a", "T3b", "T3c", "T4"])
+        cT_label = st.selectbox("Catégorie (sans saisie de taille)", ct_labels, index=0)
+        cT = ct_map[cT_label]
+
         cN_pos = st.radio("Adénopathies cliniques (cN+) ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        size_cm = st.number_input("Taille max (cm)", min_value=0.5, max_value=25.0, value=3.0, step=0.1)
         thrombus = st.selectbox("Thrombus veineux", ["Aucun", "Veine rénale", "VCC infra-hépatique", "VCC supra-hépatique/atrium"])
         rein_unique_ou_CKD = st.radio("Rein unique ou CKD significative ?", ["Non", "Oui"], horizontal=True) == "Oui"
         tumeur_hilaire = st.radio("Tumeur hilaire/centrale ?", ["Non", "Oui"], horizontal=True) == "Oui"
@@ -2302,11 +2540,12 @@ def render_kidney_local_page():
         age = st.number_input("Âge (ans)", min_value=18, max_value=100, value=62)
         haut_risque_op = st.radio("Haut risque opératoire ?", ["Non", "Oui"], horizontal=True) == "Oui"
         biopsie_dispo = st.radio("Biopsie disponible ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
         submitted = st.form_submit_button("🔎 Générer la CAT – Rein non métastatique")
 
     if submitted:
         plan = plan_rein_local(
-            cT, cN_pos, size_cm, thrombus, rein_unique_ou_CKD, tumeur_hilaire,
+            cT, cN_pos, thrombus, rein_unique_ou_CKD, tumeur_hilaire,
             exophytique, age, haut_risque_op, biopsie_dispo
         )
         render_kv_table("🧾 Données saisies", plan["donnees"])
@@ -2359,89 +2598,8 @@ def render_kidney_meta_page():
         oligo = st.radio("Oligométastatique (nombre limité, résécable/irradiable) ?", ["Non", "Oui"], horizontal=True) == "Oui"
         bone = st.radio("Métastases osseuses ?", ["Non", "Oui"], horizontal=True) == "Oui"
         brain = st.radio("Métastases cérébrales ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        liver = st.radio("Métastases hépatiques ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        io_contra = st.radio("Contre-indication à l’immunothérapie ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        liver = st.radio("Métastases hépatiques ?", ["Non", "Oui"], horizontal=Tru
 
-        submitted = st.form_submit_button("🔎 Générer la CAT – Rein métastatique")
-
-    if submitted:
-        if risk_system.startswith("IMDC"):
-            score, group = calc_imdc(karnofsky_lt80, time_le_12, hb_basse, ca_haut, neutro_hauts, plaquettes_hautes)
-            label = "IMDC (Heng)"
-        else:
-            score, group = calc_mskcc(karnofsky_lt80, time_le_12, hb_basse, ca_haut, ldh_haut)
-            label = "MSKCC (Motzer)"
-
-        plan = plan_rein_meta(
-            "ccRCC" if "ccRCC" in histo else "non-ccRCC",
-            score, group, label, oligo, bone, brain, liver, io_contra
-        )
-
-        render_kv_table("🧾 Données saisies", plan["donnees"])
-        render_kv_table("📊 Stratification", plan["stratification"], "Système", "Résultat")
-        st.markdown("### 💊 Traitement — Options numérotées")
-        for x in plan["traitement"]:
-            st.markdown("- " + x)
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["suivi"]:
-            st.markdown("- " + x)
-        if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]:
-                st.markdown("- " + x)
-
-        sections = {
-            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
-            "Stratification": [f"{label}: {group} (score {score})"],
-            "Traitement (options)": plan["traitement"],
-            "Modalités de suivi": plan["suivi"],
-            "Notes": plan["notes"],
-        }
-        report_text = build_report_text("CAT Rein métastatique", sections)
-        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Rein_Metastatique")
-
-
-def render_kidney_biopsy_page():
-    btn_home_and_back(show_back=True, back_label="Tumeur du rein")
-    st.header("🔷 Rein — Indications de biopsie percutanée")
-    with st.form("kidney_biopsy_form"):
-        indication_systemique = st.radio("Projet de traitement systémique (métastatique) nécessitant confirmation histo ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        indication_ablation = st.radio("Traitement focal (cryo/RFA) envisagé ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        inoperable_haut_risque = st.radio("Patient inopérable/haut risque chirurgical ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        lesion_indet = st.radio("Lésion indéterminée en imagerie (diagnostic incertain) ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        suspicion_lymphome_metastase_infection = st.radio("Suspicion lymphome / métastase d’un primitif / infection ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        rein_unique_ou_ckd = st.radio("Rein unique ou CKD significative ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        petite_masse_typique_et_chirurgie_prevue = st.radio("Petite masse solide typique (T1) et chirurgie conservatrice déjà prévue chez patient apte ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        bosniak = st.selectbox("Si lésion kystique : classification Bosniak", ["Non applicable", "II", "IIF", "III", "IV"])
-        troubles_coag_non_corriges = st.radio("Troubles de coagulation non corrigés ?", ["Non", "Oui"], horizontal=True) == "Oui"
-
-        submitted = st.form_submit_button("🔎 Générer la conduite — Biopsie")
-    if submitted:
-        plan = plan_rein_biopsy(
-            indication_systemique, indication_ablation, inoperable_haut_risque,
-            lesion_indet, suspicion_lymphome_metastase_infection, rein_unique_ou_ckd,
-            petite_masse_typique_et_chirurgie_prevue, bosniak, troubles_coag_non_corriges
-        )
-        render_kv_table("🧾 Données saisies", plan["donnees"])
-        st.markdown("### 🧭 Conduite proposée")
-        for x in plan["conduite"]:
-            st.markdown("- " + x)
-        st.markdown("### 📅 Modalités de suivi")
-        for x in plan["suivi"]:
-            st.markdown("- " + x)
-        if plan["notes"]:
-            st.markdown("### 📝 Notes")
-            for x in plan["notes"]:
-                st.markdown("- " + x)
-
-        sections = {
-            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
-            "Conduite": plan["conduite"],
-            "Modalités de suivi": plan["suivi"],
-            "Notes": plan["notes"],
-        }
-        report_text = build_report_text("Conduite — Biopsie rénale", sections)
-        st.markdown("### 📤 Export"); offer_exports(report_text, "Conduite_Biopsie_Renale")
 
 def render_hbp_page():
     btn_home_and_back()
