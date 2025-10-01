@@ -451,11 +451,7 @@ def render_hbp_page():
         ir_post_obstacle = st.radio("Altération rénale post-obstructive ?", ["Non","Oui"], horizontal=True) == "Oui"
         echec_medical = st.radio("Échec / intolérance du traitement médical ?", ["Non","Oui"], horizontal=True) == "Oui"
 
-        st.markdown("#### Profil des symptômes")
-        stockage_predominant = st.radio("SBAU de remplissage prédominants ?", ["Non","Oui"], horizontal=True) == "Oui"
-        rpm_val = st.number_input("Résidu post-mictionnel (mL) — 0 si non mesuré", min_value=0, max_value=1000, value=0, step=10)
-        rpm_ml = None if rpm_val == 0 else int(rpm_val)
-        dysfonction_erectile = st.radio("Dysfonction érectile associée ?", ["Non","Oui"], horizontal=True) == "Oui"
+       
 
         submitted = st.form_submit_button("🔎 Générer la CAT – HBP")
 
@@ -463,7 +459,7 @@ def render_hbp_page():
         plan = plan_hbp(
             age, volume_ml, ipss, psa_total, tr_suspect, anticoag, ci_chirurgie, refus_chir,
             infections_recid, retention, calculs, hematurie_recid, ir_post_obstacle, echec_medical,
-            stockage_predominant=stockage_predominant, rpm_ml=rpm_ml, dysfonction_erectile=dysfonction_erectile
+          
         )
 
         render_kv_table("🧾 Données saisies", plan["donnees"])
