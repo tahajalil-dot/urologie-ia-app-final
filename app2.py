@@ -378,7 +378,7 @@ def render_hbp_page(*args, **kwargs) -> Dict[str, Any]:
     """
     # 1) Appel 100% kwargs (nouvelle signature)
     if not args:
-        return render_hbp_page(**kwargs)
+        return render_hbp_page()
 
     # 2) Ancienne signature positionnelle (avec lobe_median & preservation_ejac)
     if len(args) >= 16:
