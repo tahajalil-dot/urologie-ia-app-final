@@ -228,7 +228,7 @@ def eval_suspicion_adk(psa_total: float, volume_ml: int, tr_suspect: Union[bool,
 # =========================
 # Coeur logique : NOUVELLE signature (sans lobe_median / preservation_ejac)
 # =========================
-def _plan_hbp_core(
+def render_hbp_page(
     age: int,
     volume_ml: int,
     ipss: int,
@@ -364,7 +364,7 @@ def _plan_hbp_core(
 # =========================
 # ADAPTATEUR : accepte ANCIEN appel (avec lobe_median, preservation_ejac) et NOUVEL appel
 # =========================
-def plan_hbp(*args, **kwargs) -> Dict[str, Any]:
+def render_hbp_page(*args, **kwargs) -> Dict[str, Any]:
     """
     Adapte les appels positionnels:
       Ancienne signature (≥16 args positionnels):
@@ -444,7 +444,7 @@ def plan_hbp(*args, **kwargs) -> Dict[str, Any]:
         )
 
     # 4) Sinon, on tente de compléter depuis kwargs (mots-clés)
-    return _plan_hbp_core(**kwargs)
+    return render_hbp_page(**kwargs)
 
 # =========================
 # LOGIQUE CLINIQUE — PROSTATE (Localisé / Récidive / Métastatique)
