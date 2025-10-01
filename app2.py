@@ -2829,6 +2829,7 @@ elif page == "IU: Prostatite":
 elif page == "Lithiase":
     render_lithiase_page()
 elif page == "Hypertrophie bénigne de la prostate (HBP)":
+       render_hbp_page()
 elif page == "Tumeur de la prostate":
     render_prostate_menu()
 elif page == "Prostate: Localisée":
