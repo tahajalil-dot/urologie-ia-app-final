@@ -364,7 +364,7 @@ def _plan_hbp_core(
 # =========================
 # ADAPTATEUR : accepte ANCIEN appel (avec lobe_median, preservation_ejac) et NOUVEL appel
 # =========================
-render_hbp_page():
+def plan_hbp(*args, **kwargs) -> Dict[str, Any]:
     """
     Adapte les appels positionnels:
       Ancienne signature (≥16 args positionnels):
