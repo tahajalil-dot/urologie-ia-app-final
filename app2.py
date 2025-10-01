@@ -2598,48 +2598,32 @@ def render_kidney_meta_page():
         oligo = st.radio("Oligométastatique (nombre limité, résécable/irradiable) ?", ["Non", "Oui"], horizontal=True) == "Oui"
         bone = st.radio("Métastases osseuses ?", ["Non", "Oui"], horizontal=True) == "Oui"
         brain = st.radio("Métastases cérébrales ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        liver = st.radio("Métastases hépatiques ?", ["Non", "Oui"], horizontal=Tru
+        liver = st.radio("Métastases hépatiques ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        io_contra = st.radio("Contre-indication à l’immunothérapie ?", ["Non", "Oui"], horizontal=True) == "Oui"
 
-
-def render_hbp_page():
-    btn_home_and_back()
-    st.header("🔷 Hypertrophie bénigne de la prostate (HBP) — triage PSAD + CAT détaillée")
-
-    with st.form("hbp_form"):
-        age = st.number_input("Âge", min_value=40, max_value=100, value=65)
-        volume = st.number_input("Volume prostatique (mL)", min_value=10, max_value=250, value=45)
-        ipss = st.slider("Score IPSS", 0, 35, 18)
-        psa_total = st.number_input("PSA total (ng/mL)", min_value=0.0, step=0.1, value=1.6)
-        tr_suspect = st.radio("Toucher rectal suspect ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        anticoag = st.radio("Anticoagulants/antiagrégants ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        ci_chirurgie = st.radio("Contre-indication à la chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
-        refus_chir = st.radio("Refus de chirurgie ?", ["Non", "Oui"], horizontal=True) == "Oui"
-
-        st.markdown("#### Complications (cocher si présentes)")
-        c1, c2, c3, c4, c5 = st.columns(5)
-        with c1: infections_recid = st.checkbox("IU récidivantes")
-        with c2: retention = st.checkbox("Rétention urinaire")
-        with c3: calculs = st.checkbox("Calculs vésicaux")
-        with c4: hematurie_recid = st.checkbox("Hématurie récidivante")
-        with c5: ir_post_obstacle = st.checkbox("Altération fonction rénale")
-
-        echec_medical = st.checkbox("Non amélioration sous traitement médical (échec)")
-
-        submitted = st.form_submit_button("🔎 Générer la CAT – HBP")
+        submitted = st.form_submit_button("🔎 Générer la CAT – Rein métastatique")
 
     if submitted:
-        plan = plan_hbp(
-            age, volume, ipss, psa_total, tr_suspect, anticoag,
-            ci_chirurgie, refus_chir, infections_recid,
-            retention, calculs, hematurie_recid, ir_post_obstacle, echec_medical
+        if risk_system.startswith("IMDC"):
+            score, group = calc_imdc(karnofsky_lt80, time_le_12, hb_basse, ca_haut, neutro_hauts, plaquettes_hautes)
+            label = "IMDC (Heng)"
+        else:
+            score, group = calc_mskcc(karnofsky_lt80, time_le_12, hb_basse, ca_haut, ldh_haut)
+            label = "MSKCC (Motzer)"
+
+        plan = plan_rein_meta(
+            "ccRCC" if "ccRCC" in histo else "non-ccRCC",
+            score, group, label, oligo, bone, brain, liver, io_contra
         )
 
         render_kv_table("🧾 Données saisies", plan["donnees"])
-
-        st.markdown("### 💊 Conduite à tenir / Options (classées)")
+        render_kv_table("📊 Stratification", plan["stratification"], "Système", "Résultat")
+        st.markdown("### 💊 Traitement — Options numérotées")
         for x in plan["traitement"]:
             st.markdown("- " + x)
-
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
         if plan["notes"]:
             st.markdown("### 📝 Notes")
             for x in plan["notes"]:
@@ -2647,11 +2631,57 @@ def render_hbp_page():
 
         sections = {
             "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
-            "Conduite à tenir / Options": plan["traitement"],
+            "Stratification": [f"{label}: {group} (score {score})"],
+            "Traitement (options)": plan["traitement"],
+            "Modalités de suivi": plan["suivi"],
             "Notes": plan["notes"],
         }
-        report_text = build_report_text("CAT HBP (triage PSAD)", sections)
-        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_HBP")
+        report_text = build_report_text("CAT Rein métastatique", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_Rein_Metastatique")
+
+
+def render_kidney_biopsy_page():
+    btn_home_and_back(show_back=True, back_label="Tumeur du rein")
+    st.header("🔷 Rein — Indications de biopsie percutanée")
+    with st.form("kidney_biopsy_form"):
+        indication_systemique = st.radio("Projet de traitement systémique (métastatique) nécessitant confirmation histo ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        indication_ablation = st.radio("Traitement focal (cryo/RFA) envisagé ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        inoperable_haut_risque = st.radio("Patient inopérable/haut risque chirurgical ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        lesion_indet = st.radio("Lésion indéterminée en imagerie (diagnostic incertain) ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        suspicion_lymphome_metastase_infection = st.radio("Suspicion lymphome / métastase d’un primitif / infection ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        rein_unique_ou_ckd = st.radio("Rein unique ou CKD significative ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        petite_masse_typique_et_chirurgie_prevue = st.radio("Petite masse solide typique (T1) et chirurgie conservatrice déjà prévue chez patient apte ?", ["Non", "Oui"], horizontal=True) == "Oui"
+        bosniak = st.selectbox("Si lésion kystique : classification Bosniak", ["Non applicable", "II", "IIF", "III", "IV"])
+        troubles_coag_non_corriges = st.radio("Troubles de coagulation non corrigés ?", ["Non", "Oui"], horizontal=True) == "Oui"
+
+        submitted = st.form_submit_button("🔎 Générer la conduite — Biopsie")
+    if submitted:
+        plan = plan_rein_biopsy(
+            indication_systemique, indication_ablation, inoperable_haut_risque,
+            lesion_indet, suspicion_lymphome_metastase_infection, rein_unique_ou_ckd,
+            petite_masse_typique_et_chirurgie_prevue, bosniak, troubles_coag_non_corriges
+        )
+        render_kv_table("🧾 Données saisies", plan["donnees"])
+        st.markdown("### 🧭 Conduite proposée")
+        for x in plan["conduite"]:
+            st.markdown("- " + x)
+        st.markdown("### 📅 Modalités de suivi")
+        for x in plan["suivi"]:
+            st.markdown("- " + x)
+        if plan["notes"]:
+            st.markdown("### 📝 Notes")
+            for x in plan["notes"]:
+                st.markdown("- " + x)
+
+        sections = {
+            "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
+            "Conduite": plan["conduite"],
+            "Modalités de suivi": plan["suivi"],
+            "Notes": plan["notes"],
+        }
+        report_text = build_report_text("Conduite — Biopsie rénale", sections)
+        st.markdown("### 📤 Export"); offer_exports(report_text, "Conduite_Biopsie_Renale")
+
 
 # =========================
 # PAGES — PROSTATE (UI)
