@@ -357,8 +357,8 @@ def _plan_hbp_core(
         if ipss <= 7:
             # STRICTEMENT 2 options
             options.append(
-                f"Option {n} : abstention-surveillance — informer du faible risque évolutif + conseils hygiéno-diététiques "
-                "(réduire apports hydriques après 18h, diminuer caféine/alcool, traiter la constipation)."
+                f"Option {n} : abstention-surveillance — informer du faible risque évolutif + conseils hygiéno-diététiques,(réduire apports hydriques après 18h, diminuer caféine/alcool, traiter la constipation). "
+                
             ); n += 1
             options.append(
                 f"Option {n} : traitement médical — α-bloquant (monothérapie). "
@@ -368,10 +368,10 @@ def _plan_hbp_core(
             options.append(
                 f"Option {n} : α-bloquant en première intention puis réévaluation clinique/IPSS pour vérifier amélioration ou échec sous traitement."
             ); n += 1
-            if volume_ml > 40:
+            if volume_ml >40:
                 options.append(
-                    f"Option {n} : inhibiteur de la 5α-réductase (finastéride/dutastéride) si volume > 40 mL "
-                    "(effet en plusieurs mois, ↓volume ~20 %, ↓risque de RAU; PSA mesuré ≈ 50 % du réel)."
+                    f"Option {n} : inhibiteur de la 5α-réductase,effet en plusieurs mois, ↓volume ~20 %, ↓risque de RAU; PSA mesuré ≈ 50 % du réel  "
+                    
                 ); n += 1
                 options.append(
                     f"Option {n} : association α-bloquant + I5AR si monothérapie insuffisante (efficacité supérieure; EI cumulatifs)."
@@ -384,15 +384,13 @@ def _plan_hbp_core(
             options.append(
                 f"Option {n} : alternative — phytothérapie (Serenoa repens / Pygeum africanum) (tolérance bonne, efficacité modeste)."
             ); n += 1
-            options.append(
-                f"Option {n} : traitement mini-invasif — incision cervico-prostatique (≤ 30–40 mL), implants, vapeur d’eau (Rezūm) selon disponibilité."
-            ); n += 1
+            
 
     # (3) Indication chirurgicale stricte → chirurgie si possible, sinon alternatives/palliatif
     if indication_chir_stricte and not ci_chirurgie and not refus_chir:
         if 30 <= volume_ml <= 70:
             options.append(f"Option {n} : RTUP (mono/bipolaire) ou vaporisation endoscopique (laser/bipolaire) pour 30–70 mL."); n += 1
-        if volume_ml >= 70:
+        if volume_ml >= 71:
             options.append(f"Option {n} : énucléation endoscopique (HoLEP/ThuLEP/BipolEP) pour ≥ 70–100+ mL."); n += 1
         if volume_ml > 100:
             options.append(f"Option {n} : adénomectomie sus-pubienne (ouverte/robot) si très gros volumes ou si énucléation indisponible."); n += 1
