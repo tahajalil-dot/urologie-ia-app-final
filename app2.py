@@ -552,20 +552,6 @@ def render_hbp_page():
         report_text = build_report_text("CAT HBP", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_HBP")
 
-"""
-Module décisionnel — CANCER DE LA PROSTATE (Localisé / Récidive / Métastatique)
-Version: 2025-10-05
-Auteur: Taha + Assistant
-
-⚠️ AVERTISSEMENT
-- Squelette clinique à FINALISER/VALIDER selon vos référentiels (AFU/EAU/NCCN/AUA) et votre RCP locale.
-- Ne remplace PAS un avis spécialisé.
-
-OBJECTIF
-- Fournir un module *autonome* et *propre* qui couvre l'ensemble du parcours (localisé, récidive, métastatique).
-- S'aligne STRICTEMENT sur tes diapositives pour: D'Amico (localisé) et options thérapeutiques basées sur le risque.
-- Conserve des noms de fonctions stables pour intégration facile dans l'app existante.
-"""
 
 # ===========================
 # 0) Imports & Typage (3.8+)
