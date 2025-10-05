@@ -5,6 +5,7 @@
 # - Le module HBP a été modifié pour: (1) ne PAS proposer de médical si indication chirurgicale stricte
 #   (échec médical OU complications OU lobe médian) ; (2) présenter toutes les options en "Option 1, 2, ...".
 
+from __future__ import annotations
 import base64
 from datetime import datetime
 from pathlib import Path
@@ -567,7 +568,6 @@ Ce module consolide :
 ⚠️ AVERTISSEMENT: Code fourni à titre de squelette technique. Il NE remplace PAS un avis médical.
    Adaptez/validez les règles selon vos référentiels locaux (EAU/AUA/AFU/NCCN) et votre RCP.
 """
-from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional, Dict, Any, Tuple
