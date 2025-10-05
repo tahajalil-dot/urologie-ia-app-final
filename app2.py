@@ -552,142 +552,398 @@ def render_hbp_page():
         report_text = build_report_text("CAT HBP", sections)
         st.markdown("### 📤 Export"); offer_exports(report_text, "CAT_HBP")
 
-# =========================
-# LOGIQUE CLINIQUE — PROSTATE (Localisé / Récidive / Métastatique)
-# =========================
+"""
+Moteur de décision – Cancer de la prostate (intégration)
+
+Ce module consolide :
+1) Un modèle de données d'entrée patient
+2) Une stratification de risque (approx. D'Amico / NCCN / AFU — à valider selon votre référentiel)
+3) Un moteur de recommandations basé sur des règles (YAML/JSON)
+4) Un bloc de logique clinique (localisé / récidive / métastatique) fourni par l'utilisateur, avec normalisation cT
+5) Des façades pour orchestrer les décisions à partir de PatientPCa
+6) Des hooks pour mapper un tableau/algorithme issu d'une image vers des règles structurées
+7) Des auto-tests rapides
+
+⚠️ AVERTISSEMENT: Code fourni à titre de squelette technique. Il NE remplace PAS un avis médical.
+   Adaptez/validez les règles selon vos référentiels locaux (EAU/AUA/AFU/NCCN) et votre RCP.
+"""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import List, Optional, Dict, Any, Tuple
+
+# =====================
+# 1) Modèle de données
+# =====================
+class ClinicalT(str, Enum):
+    T1a = "T1a"; T1b = "T1b"; T1c = "T1c"
+    T2a = "T2a"; T2b = "T2b"; T2c = "T2c"
+    T3a = "T3a"; T3b = "T3b"; T4 = "T4"
+
+class NStage(str, Enum):
+    N0 = "N0"; N1 = "N1"; Nx = "Nx"
+
+class MStage(str, Enum):
+    M0 = "M0"; M1a = "M1a"; M1b = "M1b"; M1c = "M1c"; Mx = "Mx"
+
+class GradeGroup(int, Enum):
+    GG1 = 1; GG2 = 2; GG3 = 3; GG4 = 4; GG5 = 5
+
+class RiskGroup(str, Enum):
+    VERY_LOW = "very_low"
+    LOW = "low"
+    FAV_INT = "favorable_intermediate"
+    UNFAV_INT = "unfavorable_intermediate"
+    HIGH = "high"
+    VERY_HIGH = "very_high"
+    METASTATIC = "metastatic"
+
+@dataclass
+class PatientPCa:
+    age: int
+    psa: float  # ng/mL
+    clinical_t: ClinicalT
+    grade_group: GradeGroup
+    n_stage: NStage = NStage.N0
+    m_stage: MStage = MStage.M0
+    cores_positive: Optional[int] = None
+    cores_total: Optional[int] = None
+    max_core_involvement_pct: Optional[float] = None  # max % involvement in any core
+    psa_density: Optional[float] = None  # ng/mL/cc (si dispo)
+    life_expectancy_years: Optional[int] = None
+    ecog: Optional[int] = None
+    charlson_index: Optional[int] = None
+    preferences: Dict[str, Any] = field(default_factory=dict)
+
+    def percent_cores_positive(self) -> Optional[float]:
+        if self.cores_positive is None or self.cores_total in (None, 0):
+            return None
+        return 100.0 * self.cores_positive / self.cores_total
+
+# ======================================
+# 2) Stratification de risque (approx.)
+# ======================================
+
+def infer_risk_group(p: PatientPCa) -> RiskGroup:
+    """Approximation des groupes de risque.
+    ⚠️ À VALIDER selon votre référentiel local. Simplification pédagogique.
+    """
+    # Métastatique si N1/M1
+    if p.m_stage in {MStage.M1a, MStage.M1b, MStage.M1c} or p.n_stage == NStage.N1:
+        return RiskGroup.METASTATIC
+
+    # Très haut risque
+    if p.clinical_t in {ClinicalT.T3b, ClinicalT.T4}:
+        return RiskGroup.VERY_HIGH
+
+    # Haut risque
+    if p.grade_group in {GradeGroup.GG4, GradeGroup.GG5} or p.psa > 20 or p.clinical_t == ClinicalT.T3a:
+        return RiskGroup.HIGH
+
+    # Intermédiaire défavorable
+    interm_factors = 0
+    if 10 <= p.psa <= 20: interm_factors += 1
+    if p.clinical_t in {ClinicalT.T2b, ClinicalT.T2c}: interm_factors += 1
+    if p.grade_group in {GradeGroup.GG2, GradeGroup.GG3}: interm_factors += 1
+    pct_cores = p.percent_cores_positive()
+    if p.grade_group == GradeGroup.GG3 or (interm_factors >= 2) or (pct_cores is not None and pct_cores >= 50):
+        return RiskGroup.UNFAV_INT
+
+    # Intermédiaire favorable
+    if interm_factors == 1 and p.grade_group in {GradeGroup.GG1, GradeGroup.GG2} and (pct_cores is None or pct_cores < 50):
+        return RiskGroup.FAV_INT
+
+    # Très faible
+    if (
+        p.clinical_t == ClinicalT.T1c and p.grade_group == GradeGroup.GG1 and p.psa < 10 and
+        (p.cores_positive is not None and p.cores_positive < 3) and
+        (p.max_core_involvement_pct is not None and p.max_core_involvement_pct <= 50) and
+        (p.psa_density is not None and p.psa_density < 0.15)
+    ):
+        return RiskGroup.VERY_LOW
+
+    # Faible
+    if p.grade_group == GradeGroup.GG1 and p.psa < 10 and p.clinical_t in {ClinicalT.T1a, ClinicalT.T1b, ClinicalT.T1c, ClinicalT.T2a}:
+        return RiskGroup.LOW
+
+    return RiskGroup.FAV_INT
+
+# ================================================================
+# 3) Moteur de recommandations basé sur des règles (YAML/JSON)
+# ================================================================
+
+class RuleEngine:
+    """Charge un dict de règles (p.ex. depuis YAML) et retourne des options.
+
+    Format attendu (exemple minimal) :
+    {
+      "very_low": {
+        "life_exp": {
+          ">=10": ["surveillance_active", "prostatectomie_radicale?", "radiotherapie?"],
+          "<10": ["surveillance_active", "watchful_waiting"]
+        },
+        "notes": "Adapter selon préférences/PSAD/IRMs."
+      },
+      "low": {"default": ["surveillance_active", "prostatectomie_radicale", "radiotherapie"]},
+      "favorable_intermediate": {"default": ["prostatectomie_radicale", "radiotherapie±ADT_court"]},
+      "unfavorable_intermediate": {"default": ["radiotherapie+ADT_4-6m", "prostatectomie_radicale(±ganglionnaire)"]},
+      "high": {"default": ["radiotherapie+ADT_long", "prostatectomie_radicale_selon_selection"]},
+      "very_high": {"default": ["radiotherapie+ADT_long(±intensification)"]},
+      "metastatic": {"default": ["ADT+ARPI/docetaxel", "RT ciblée si oligométastatique"]}
+    }
+    """
+    def __init__(self, rules: Dict[str, Any]):
+        self.rules = rules
+
+    def recommend(self, patient: PatientPCa, risk: Optional[RiskGroup] = None) -> Dict[str, Any]:
+        risk = risk or infer_risk_group(patient)
+        bucket = self.rules.get(risk.value, {})
+        life = patient.life_expectancy_years
+        options: List[str] = []
+        if "life_exp" in bucket and life is not None:
+            for k, vals in bucket["life_exp"].items():
+                if _match_numeric_condition(life, k):
+                    options.extend(vals)
+        if not options:
+            options.extend(bucket.get("default", []))
+        return {
+            "risk_group": risk.value,
+            "options": _unique_preserve_order(options),
+            "notes": bucket.get("notes")
+        }
+
+# ================================
+# 4) Parsing depuis une image/table (structure attendue)
+# ================================
+
+def map_image_guideline_to_rules(structured_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Transforme des éléments structurés (extraits d'une image/guideline)
+    en un dict de règles compatible RuleEngine (voir format ci-dessus).
+
+    structured_items: liste d'objets du type
+      [{"risk": "low", "life_cond": ">=10", "options": ["SA", "RP", "RT"], "notes": "..."}, ...]
+    """
+    rules: Dict[str, Any] = {}
+    for it in structured_items:
+        risk = it.get("risk")
+        bucket = rules.setdefault(risk, {})
+        life_cond = it.get("life_cond")
+        if life_cond:
+            bucket.setdefault("life_exp", {})
+            bucket["life_exp"].setdefault(life_cond, [])
+            bucket["life_exp"][life_cond].extend(it.get("options", []))
+        else:
+            bucket.setdefault("default", [])
+            bucket["default"].extend(it.get("options", []))
+        if it.get("notes"):
+            bucket["notes"] = it["notes"]
+    for k in list(rules.keys()):
+        b = rules[k]
+        if "default" in b:
+            b["default"] = _unique_preserve_order(b["default"])
+        if "life_exp" in b:
+            for cond, vals in b["life_exp"].items():
+                b["life_exp"][cond] = _unique_preserve_order(vals)
+    return rules
+
+# =====================
+# Utilitaires internes
+# =====================
+
+def _unique_preserve_order(seq: List[str]) -> List[str]:
+    seen = set(); out = []
+    for x in seq:
+        if x not in seen:
+            seen.add(x); out.append(x)
+    return out
+
+
+def _match_numeric_condition(value: int, cond: str) -> bool:
+    """Évalue des conditions simples de type '>=10', '<10', '==5', '8-12'."""
+    cond = cond.replace(" ", "")
+    try:
+        if cond.startswith(">="):
+            return value >= int(cond[2:])
+        if cond.startswith("<="):
+            return value <= int(cond[2:])
+        if cond.startswith(">"):
+            return value > int(cond[1:])
+        if cond.startswith("<"):
+            return value < int(cond[1:])
+        if cond.startswith("=="):
+            return value == int(cond[2:])
+        if "-" in cond:
+            a, b = cond.split("-", 1)
+            return int(a) <= value <= int(b)
+        return value == int(cond)
+    except Exception:
+        return False
+
+# ==============================================
+# 5) Bloc logique clinique intégré (utilisateur)
+# ==============================================
+
+# Normalisation de cT (tolère T1/T3 raccourcis)
+_CTN_MAP = {
+    "T1a":"T1a","T1b":"T1b","T1c":"T1c",
+    "T2a":"T2a","T2b":"T2b","T2c":"T2c",
+    "T3a":"T3a","T3b":"T3b","T4":"T4",
+    "T1":"T1c",  # défaut bas risque
+    "T3":"T3a"
+}
+
+def normalize_cT(cT: str) -> str:
+    cT = (cT or "").strip().upper().replace(" ", "")
+    if len(cT) >= 2 and cT[0] == "T":
+        if len(cT) == 3 and cT[2].isalpha():
+            cT = cT[:2] + cT[2].lower()
+    return _CTN_MAP.get(cT, cT)
 
 # --- 1) Strate de risque (D'Amico adapté AFU) ---
+
 def prostate_risk_damico(psa: float, isup: int, cT: str) -> str:
     """
-    Retourne 'faible', 'intermédiaire', 'élevé'.
-    D'Amico (adapté AFU localisé) : 
-      - FAIBLE   : T1–T2a ET PSA < 10 ET ISUP 1
-      - INTER    : PSA 10–20 OU ISUP 2–3 OU T2b–T2c (sans critère 'élevé')
-      - ÉLEVÉ    : PSA > 20 OU ISUP 4–5 OU ≥ T3
-    # IBJSR6-main.pdf — AFU localisé : les parties 'prise en charge de la maladie localisée' cadrent ces approches (ex. F418 L31-L35 pour PT comme traitement de référence).
+    STRICTEMENT selon la diapo D'Amico (localisé) fournie :
+      - FAIBLE    si (stade ≤ T2a) ET (ISUP == 1) ET (PSA ≤ 10)
+      - INTER     si (T2b) OU (ISUP 2–3) OU (PSA 10–20) SANS critère haut risque
+      - ÉLEVÉ     si (stade ≥ T2c) OU (ISUP 4–5) OU (PSA > 20)
+    NB: On normalise cT et on compare par rangs pour gérer « ≤ » et « ≥ ».
     """
-    t_high = cT.startswith("T3") or cT.startswith("T4")
-    t_inter = cT in ["T2b", "T2c"]
-    if (psa > 20) or (isup >= 4) or t_high:
+    cTn = normalize_cT(cT)
+
+    def _ct_rank(x: str) -> int:
+        order = {
+            "T1a": 10, "T1b": 11, "T1c": 12,
+            "T2a": 20, "T2b": 21, "T2c": 22,
+            "T3a": 30, "T3b": 31, "T4": 40
+        }
+        return order.get(x, 999)
+
+    r = _ct_rank(cTn)
+    r_T2a, r_T2b, r_T2c = _ct_rank("T2a"), _ct_rank("T2b"), _ct_rank("T2c")
+
+    # 1) Haut risque d'abord (OR)
+    if (r >= r_T2c) or (isup in (4, 5)) or (psa > 20):
         return "élevé"
-    if (10 <= psa <= 20) or (isup in [2, 3]) or t_inter:
+
+    # 2) Intermédiaire (OR) si pas haut risque
+    if (r == r_T2b) or (isup in (2, 3)) or (10 <= psa <= 20):
         return "intermédiaire"
-    if (psa < 10) and (isup == 1) and (cT in ["T1", "T2a"]):
+
+    # 3) Faible (AND strict)
+    if (r <= r_T2a) and (isup == 1) and (psa <= 10):
         return "faible"
-    # Par défaut, classer intermédiaire si ambigu
+
+    # Par prudence si entrée atypique
+    return "intermédiaire"
+    if (psa < 10) and (isup == 1) and (cTn in ["T1a","T1b","T1c","T2a"]):
+        return "faible"
     return "intermédiaire"
 
+# === Schéma de formulaire (D'Amico localisé) ===
+DAMICO_LOCALISE_FORM_SCHEMA: Dict[str, Any] = {
+    "title": "Classification de D'Amico — Localisé",
+    "type": "object",
+    "required": ["psa", "isup", "cT"],
+    "properties": {
+        "cT": {
+            "title": "Stade clinique (cT)",
+            "type": "string",
+            "enum": ["T1a","T1b","T1c","T2a","T2b","T2c"],
+            "description": "Limiter au localisé : ≤T2c pour le formulaire."
+        },
+        "isup": {
+            "title": "ISUP (Gleason Grade Group)",
+            "type": "integer",
+            "enum": [1,2,3,4,5]
+        },
+        "psa": {
+            "title": "PSA sérique (ng/mL)",
+            "type": "number",
+            "minimum": 0
+        }
+    }
+}
 
-# --- 2) CAT — Prostate localisée (options + degré) ---
+def damico_localise_from_inputs(psa: float, isup: int, cT: str) -> str:
+    """Helper simple pour brancher le formulaire → risque D'Amico localisé."""
+    return prostate_risk_damico(psa=psa, isup=isup, cT=cT)
+
+# --- 2) CAT — Prostate localisée ---
+
 def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: int):
-    """
-    Retourne dict {donnees, risque, options, notes}
-    Chaque option = {label, degre ('fort'/'moyen'/'faible'), details}
-    Références (commentaires) :
-      - PT = traitement de référence dans le localisé (IBJSR6 F418 L31-L35).
-      - Surveillance active pour bas-risque (AFU localisé, section dédiée ‘surveillance active’).
-      - RT externe/curiethérapie selon risque; HT courte avec RT si intermédiaire défavorable (AFU localisé).
-    """
     risque = prostate_risk_damico(psa, isup, cT)
     options = []
     idx = 1
 
     if risque == "faible":
-        # Surveillance active — fort (standard bas-risque)
         options.append({
             "label": f"Option {idx} : Surveillance active",
             "degre": "fort",
-            "details": "Bas-risque (T1–T2a, PSA<10, ISUP1). Éviter sur-traitement ; suivi structuré (PSA/IRM/cysto-biopsies selon protocole local)."
-            # AFU localisé : SA recommandée pour bas-risque.
+            "details": "Bas-risque (T1–T2a, PSA<10, ISUP1). Suivi structuré (PSA/IRM/biopsies)."
         }); idx += 1
-
-        # Prostatectomie totale — fort si espérance de vie > 10 ans
         deg = "fort" if esperance_vie_ans >= 10 else "moyen"
         options.append({
-            "label": f"Option {idx} : Prostatectomie totale (PT)",
+            "label": f"Option {idx} : Prostatectomie radicale",
             "degre": deg,
-            "details": "Traitement de référence chirurgical ; bénéfice attendu si espérance de vie ≥10 ans."
-            # IBJSR6 F418 L31-L35 : PT = un des traitements de référence du CaP localisé.
+            "details": "Traitement de référence si EV ≥10 ans."
         }); idx += 1
-
-        # Radiothérapie externe / curiethérapie — moyen
         options.append({
             "label": f"Option {idx} : Radiothérapie (RCMI/curiethérapie)",
             "degre": "moyen",
-            "details": "Alternative non invasive ; SA préférée si bas-risque pur ; pas d’HT associée en bas-risque."
-            # AFU localisé : RT standard dans localisé ; HT pas indiquée en bas-risque.
+            "details": "Alternative non invasive ; pas d’HT associée en bas-risque."
         }); idx += 1
 
     elif risque == "intermédiaire":
-        # RT +/− hormonothérapie courte — fort si 'intermédiaire défavorable'
         options.append({
             "label": f"Option {idx} : Radiothérapie externe ± hormonothérapie 4–6 mois",
             "degre": "fort",
-            "details": "RT standard ; HT courte si facteurs défavorables (ISUP3, ≥50% biopsies positives, PSA proche 20)."
-            # AFU localisé : RT + HT courte pour intermédiaire défavorable (durée typique 4–6 mois).
+            "details": "HT courte si facteurs défavorables (ISUP3, ≥50% biopsies+, PSA proche 20)."
         }); idx += 1
-
-        # Prostatectomie totale ± curage — fort si opérable
         options.append({
-            "label": f"Option {idx} : Prostatectomie totale ± curage pelvien",
+            "label": f"Option {idx} : Prostatectomie radicale ± curage pelvien",
             "degre": "fort",
-            "details": "Option de référence si opérable ; discuter marges/nerve-sparing selon tumeur."
-            # IBJSR6 F418 L31-L35 : PT = traitement de référence.
+            "details": "Option de référence si opérable ; nerve-sparing selon tumeur."
         }); idx += 1
-
-        # Surveillance active — faible (sélection ultra-stricte)
         options.append({
             "label": f"Option {idx} : Surveillance active (sélectionnée)",
             "degre": "faible",
-            "details": "À éviter si critères défavorables ; réservée à des cas très sélectionnés."
+            "details": "Réservée à des cas très sélectionnés sans critères défavorables."
         }); idx += 1
 
     else:  # élevé
-        # RT + HT longue (18–36 mois) — fort
         options.append({
             "label": f"Option {idx} : Radiothérapie + hormonothérapie prolongée (18–36 mois)",
             "degre": "fort",
-            "details": "Standard haut-risque ; bénéfice en survie ; intensifications possibles selon contexte."
-            # AFU localisé : haut-risque → RT + ADT longue.
+            "details": "Standard haut-risque ; intensification selon contexte."
         }); idx += 1
-
-        # Prostatectomie totale ± traitements complémentaires — moyen (sélectionné)
         options.append({
-            "label": f"Option {idx} : Prostatectomie totale (sélectionnée) ± RT/HT adjuvantes",
+            "label": f"Option {idx} : Prostatectomie radicale (sélectionnée) ± RT/HT adjuvantes",
             "degre": "moyen",
-            "details": "Discutée en RCP (marges, pT3, pN+). Soins complémentaires selon anatomo-path et facteurs."
+            "details": "À discuter en RCP selon marges, pT3, pN+."
         }); idx += 1
 
     notes = [
-        "Toujours décision partagée en RCP et avec le patient.",
-        "Hypofractionnements/modulations selon plateau technique (service de RT).",
+        "Décision partagée (RCP + patient).",
+        "Hypo-/modulation selon le plateau technique de RT.",
     ]
-    donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", cT), ("Espérance de vie", f"{esperance_vie_ans} ans")]
+    donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", normalize_cT(cT)), ("Espérance de vie", f"{esperance_vie_ans} ans")]
     return {"donnees": donnees, "risque": risque, "options": options, "notes": notes}
 
+# --- 3) Récidive ---
 
-# --- 3) Récidive (définition & CAT simple) ---
-def detect_recurrence(type_initial: str, psa_actuel: float, psa_nadir_post_rt: float | None, confirmations: int) -> tuple[bool, str]:
-    """
-    - Après prostatectomie : récidive biologique si PSA ≥ 0,2 ng/mL confirmé (deux dosages).
-    - Après radiothérapie : 'Phoenix' = nadir + 2,0 ng/mL.
-    Réfs AFU (récidive) : IBJSR6 — sections 'récidive' (ex. F414 L1-L6 sur diagnostic de récidive locale).
-    """
+def detect_recurrence(type_initial: str, psa_actuel: float, psa_nadir_post_rt: float | None, confirmations: int) -> Tuple[bool, str]:
     if type_initial == "Prostatectomie":
         if psa_actuel >= 0.2 and confirmations >= 2:
             return True, "Récidive biologique après prostatectomie (PSA ≥ 0,2 ng/mL confirmé)."
         return False, "Pas de récidive biologique confirmée (après prostatectomie)."
     else:  # Radiothérapie
         if (psa_nadir_post_rt is not None) and (psa_actuel >= psa_nadir_post_rt + 2.0):
-            return True, "Récidive biologique après radiothérapie (nadir + 2)."
+            return True, "Récidive biologique après radiothérapie (Phoenix : nadir + 2)."
         return False, "Pas de récidive biologique selon Phoenix (après radiothérapie)."
 
 
 def plan_prostate_recidive(type_initial: str, psa_actuel: float, psa_nadir_post_rt: float | None, confirmations: int):
-    """
-    Retourne {resume, options, notes}
-    Options avec degré indicatif; à affiner selon imagerie (PSMA-PET/IRM), délai, marge, pT, pN, vitesse PSA.
-    """
     est_recidive, resume = detect_recurrence(type_initial, psa_actuel, psa_nadir_post_rt, confirmations)
     options, idx = [], 1
 
@@ -698,61 +954,52 @@ def plan_prostate_recidive(type_initial: str, psa_actuel: float, psa_nadir_post_
                             "details": "À initier précocement ; ± hormonothérapie courte selon facteurs."}); idx += 1
             options.append({"label": f"Option {idx} : Hormonothérapie seule (si non éligible RT/chir ou progression)",
                             "degre": "moyen",
-                            "details": "Approche palliative/d’inhibition androgénique selon cinétique PSA/symptômes."}); idx += 1
+                            "details": "Approche palliative selon cinétique PSA/symptômes."}); idx += 1
         else:
-            options.append({"label": f"Option {idx} : Traitement local de rattrapage (salvage) sélectionné",
+            options.append({"label": f"Option {idx} : Traitement local de rattrapage (sélectionné)",
                             "degre": "moyen",
-                            "details": "Prostatectomie de rattrapage/curiethérapie/HIFU/cryothérapie selon localisation et expertise."}); idx += 1
+                            "details": "Prostatectomie de rattrapage/curi/HIFU/cryothérapie selon localisation et expertise."}); idx += 1
             options.append({"label": f"Option {idx} : Hormonothérapie ± traitements systémiques",
                             "degre": "moyen",
-                            "details": "Si échec local/oligo vs polyprogression ; imagerie de re-stadification requise."}); idx += 1
+                            "details": "Selon imagerie de re-stadification (PSMA-PET/IRM) et profil de progression."}); idx += 1
         notes = [
             "Re-stadifier (IRM, TEP-PSMA si dispo) avant rattrapage.",
-            "Discuter en RCP radio-onco/uro/nucléo.",
+            "Discussion RCP radio-onco/uro/nucléo.",
         ]
     else:
         options = [{"label": "Option 1 : Poursuivre la surveillance",
                     "degre": "moyen",
-                    "details": "Contrôles PSA et imagerie selon protocole ; pas d’argument de récidive pour l’instant."}]
+                    "details": "Contrôles PSA et imagerie selon protocole ; pas d’argument de récidive."}]
         notes = []
 
     return {"resume": resume, "options": options, "notes": notes}
 
-
 # --- 4) Métastatique (mHSPC vs mCRPC) ---
+
 def plan_prostate_metastatique(testosterone_castration: bool,
                                volume_eleve: bool,
                                symptomes_osseux: bool,
                                deja_docetaxel: bool,
                                deja_arpi: bool,
                                alteration_HRR: bool):
-    """
-    Retourne {profil, options, adjoints, notes}
-    Références (AFU récidive/métastatique — Abup6x-main.pdf) :
-      - mHSPC : intensification HTNG (abiratérone/enzalutamide/apalutamide) supérieure au docétaxel ; docétaxel utile surtout en haut volume (F469 L41-L47 ; F470 L50-L52).
-      - Support osseux : zoledronate/denosumab pour fractures/symptômes (F471 L28-L36).
-      - mCRPC : iPARP si altérations HRR (PROfound, TRITON-3) ; cabazitaxel après docétaxel (NEJM 2019) (F515–F516 ; F533 L29-L32).
-    """
     options, idx = [], 1
     adjoints = []
     profil = "mHSPC (sensible à la castration)" if not testosterone_castration else "mCRPC (résistant à la castration)"
 
     if not testosterone_castration:
-        # mHSPC
         options.append({"label": f"Option {idx} : ADT + ARPI (abiratérone OU enzalutamide OU apalutamide)",
                         "degre": "fort",
                         "details": "Intensification standard de 1re ligne mHSPC."}); idx += 1
         if volume_eleve:
             options.append({"label": f"Option {idx} : ADT + docétaxel (haut volume)",
                             "degre": "moyen",
-                            "details": "Bénéfice surtout en haut volume ; discuter toxicité et comorbidités."}); idx += 1
+                            "details": "Bénéfice surtout en haut volume ; discuter toxicité."}); idx += 1
         else:
-            options.append({"label": f"Option {idx} : ADT seule (si contre-indication à l’intensification)",
+            options.append({"label": f"Option {idx} : ADT seule (si CI à l’intensification)",
                             "degre": "faible",
                             "details": "Moins performant ; réservé si CI/fragilité."}); idx += 1
 
     else:
-        # mCRPC
         if not deja_arpi:
             options.append({"label": f"Option {idx} : ARPI (enzalutamide OU abiratérone)",
                             "degre": "fort",
@@ -760,22 +1007,191 @@ def plan_prostate_metastatique(testosterone_castration: bool,
         if not deja_docetaxel:
             options.append({"label": f"Option {idx} : Docétaxel",
                             "degre": "fort",
-                            "details": "Chimiothérapie de référence si éligible ; surtout si symptomatique/rapide progression."}); idx += 1
+                            "details": "Chimiothérapie de référence si éligible."}); idx += 1
         else:
             options.append({"label": f"Option {idx} : Cabazitaxel (après docétaxel)",
                             "degre": "fort",
-                            "details": "Supérieur à switch ARPI/ARPI dans procès comparatifs ; standard après docétaxel."}); idx += 1
+                            "details": "Standard après docétaxel ; efficacité > switch ARPI↔ARPI."}); idx += 1
         if alteration_HRR:
-            options.append({"label": f"Option {idx} : iPARP (olaparib/rucaparib) chez altérations BRCA/HRR",
+            options.append({"label": f"Option {idx} : iPARP (olaparib/rucaparib) si altérations BRCA/HRR",
                             "degre": "fort",
-                            "details": "Efficacité démontrée (PROfound/TRITON-3) ; combinaisons ARPI+iPARP possibles selon autorisations/local."}); idx += 1
+                            "details": "Efficacité démontrée (PROfound / TRITON-3)."}); idx += 1
 
-    # Mesures adjointes
     if symptomes_osseux:
-        adjoints.append("Soins osseux : acide zolédronique ou denosumab ; supplémentation Ca/Vit D ; évaluer radiothérapie antalgique ciblée.")
+        adjoints.append("Soins osseux : acide zolédronique ou denosumab ; Ca/Vit D ; RT antalgique ciblée si besoin.")
 
-    notes = ["Toujours décision en RCP. Séquençage selon expositions antérieures, comorbidités, préférences patient."]
+    notes = ["Décision en RCP. Séquençage selon expositions antérieures, comorbidités, préférences patient."]
     return {"profil": profil, "options": options, "adjoints": adjoints, "notes": notes}
+
+# --- 6) Façade : appel unique depuis PatientPCa + contexte ---
+
+def recommend_from_patient(patient: PatientPCa, *, contexte: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    contexte["setting"] ∈ {"localise", "recidive", "metastatique"}
+    Champs possibles :
+      - localise : esperance_vie_ans
+      - recidive : type_initial ("Prostatectomie"/"Radiothérapie"), psa_nadir_post_rt, confirmations
+      - metastatique : testosterone_castration, volume_eleve, symptomes_osseux, deja_docetaxel, deja_arpi, alteration_HRR
+    """
+    setting = contexte.get("setting")
+    if setting == "localise":
+        ev = contexte.get("esperance_vie_ans", patient.life_expectancy_years or 10)
+        return plan_prostate_localise(psa=patient.psa, isup=int(patient.grade_group), cT=patient.clinical_t.value, esperance_vie_ans=int(ev))
+    elif setting == "recidive":
+        return plan_prostate_recidive(
+            type_initial=contexte.get("type_initial", "Prostatectomie"),
+            psa_actuel=patient.psa,
+            psa_nadir_post_rt=contexte.get("psa_nadir_post_rt"),
+            confirmations=int(contexte.get("confirmations", 2))
+        )
+    elif setting == "metastatique":
+        return plan_prostate_metastatique(
+            testosterone_castration=bool(contexte.get("testosterone_castration", False)),
+            volume_eleve=bool(contexte.get("volume_eleve", False)),
+            symptomes_osseux=bool(contexte.get("symptomes_osseux", False)),
+            deja_docetaxel=bool(contexte.get("deja_docetaxel", False)),
+            deja_arpi=bool(contexte.get("deja_arpi", False)),
+            alteration_HRR=bool(contexte.get("alteration_HRR", False)),
+        )
+    else:
+        raise ValueError("contexte['setting'] doit être 'localise', 'recidive' ou 'metastatique'.")
+
+# ======================
+# 7) Exemples de règles (mock)
+# ======================
+
+EXAMPLE_RULES: Dict[str, Any] = {
+    "very_low": {
+        "life_exp": {">=10": ["surveillance_active"], "<10": ["watchful_waiting"]},
+        "notes": "Exemple fictif – remplacez par vos règles validées."
+    },
+    "low": {"default": ["surveillance_active", "prostatectomie_radicale", "radiotherapie"]},
+    "favorable_intermediate": {"default": ["prostatectomie_radicale", "radiotherapie±ADT_court"]},
+    "unfavorable_intermediate": {"default": ["radiotherapie+ADT_4-6m", "prostatectomie_radicale(±curage)"]},
+    "high": {"default": ["radiotherapie+ADT_long", "prostatectomie_radicale_selon_selection"]},
+    "very_high": {"default": ["radiotherapie+ADT_long(±intensification)"]},
+    "metastatic": {"default": ["ADT+ARPI/docetaxel", "RT ciblée si oligométastatique"]}
+}
+
+# ======================
+# 8) Auto-tests rapides
+# ======================
+
+def _selftest_logic() -> bool:
+    # Bas risque localisé
+    p1 = PatientPCa(age=62, psa=7.4, clinical_t=ClinicalT.T2a, grade_group=GradeGroup.GG1, life_expectancy_years=15)
+    r1 = recommend_from_patient(p1, contexte={"setting":"localise"})
+    assert r1["risque"] == "faible" and any("Surveillance active" in o["label"] for o in r1["options"])
+
+    # Intermédiaire localisé
+    p2 = PatientPCa(age=68, psa=12.0, clinical_t=ClinicalT.T2b, grade_group=GradeGroup.GG2, life_expectancy_years=12)
+    r2 = recommend_from_patient(p2, contexte={"setting":"localise"})
+    assert r2["risque"] == "intermédiaire" and any("Radiothérapie" in o["label"] for o in r2["options"])
+
+    # Récidive post-prostatectomie
+    p3 = PatientPCa(age=70, psa=0.25, clinical_t=ClinicalT.T1c, grade_group=GradeGroup.GG2)
+    r3 = recommend_from_patient(p3, contexte={"setting":"recidive", "type_initial":"Prostatectomie", "confirmations":2})
+    assert "Récidive biologique" in r3["resume"]
+
+    # Métastatique sensible haut volume
+    p4 = PatientPCa(age=66, psa=52.0, clinical_t=ClinicalT.T3a, grade_group=GradeGroup.GG4)
+    r4 = recommend_from_patient(p4, contexte={"setting":"metastatique", "testosterone_castration":False, "volume_eleve":True, "symptomes_osseux":True})
+    assert r4["profil"].startswith("mHSPC") and any("Docétaxel" in o["label"] for o in r4["options"])
+
+    return True
+
+if __name__ == "__main__":
+    print("Selftest clinique:", _selftest_logic())
+
+# === Ajout : helpers et plan localisé strict D'Amico ===
+
+def _ct_rank(x: str) -> int:
+    order = {"T1a":10,"T1b":11,"T1c":12,"T2a":20,"T2b":21,"T2c":22,"T3a":30,"T3b":31,"T4":40}
+    return order.get(normalize_cT(x), 999)
+
+
+def _is_vhr_stampede(cT: str, isup: int, psa: float, n_stage: Optional[str] = None) -> bool:
+    """Très haut risque non métastatique (STAMPEDE): cN+ OU ≥2 (PSA>40, ISUP≥4, ≥cT3)."""
+    cNpos = (n_stage == "N1")
+    flags = (1 if psa > 40 else 0) + (1 if isup >= 4 else 0) + (1 if _ct_rank(cT) >= _ct_rank("T3a") else 0)
+    return bool(cNpos or flags >= 2)
+
+
+def plan_prostate_localise_damico_strict(psa: float, isup: int, cT: str, esperance_vie_ans: int) -> Dict[str, Any]:
+    """Options LOCALISÉES strictement conformes aux diagrammes fournis (faible/intermédiaire/élevé)."""
+    risque = prostate_risk_damico(psa, isup, cT)
+    options: List[Dict[str, Any]] = []
+    idx = 1
+
+    if risque == "faible":
+        options.append({"label": f"Option {idx} : Prostatectomie totale*", "degre": "moyen", "details": "* Si le patient refuse la surveillance active ou si contre-indication à celle-ci."}); idx += 1
+        options.append({"label": f"Option {idx} : Radiothérapie externe* (74–80 Gy en 37–40 séances ou 60 Gy en 20 séances)**", "degre": "moyen", "details": "* Alternative à la SA ; ** Possibilité de RT stéréotaxique 35–40 Gy en 5 séances."}); idx += 1
+        options.append({"label": f"Option {idx} : Curiethérapie*", "degre": "moyen", "details": "* Si refus/CI de SA."}); idx += 1
+        options.append({"label": f"Option {idx} : Surveillance active", "degre": "fort", "details": "Standard du bas risque si éligible."}); idx += 1
+        options.append({"label": f"Option {idx} : Abstention – Surveillance*** (Watchfull waiting)", "degre": "moyen", "details": "*** Pour les patients non éligibles aux autres options avec une espérance de vie limitée."}); idx += 1
+        options.append({"label": f"Option {idx} : Cryothérapie et HIFU****", "degre": "faible", "details": "**** Dans le cadre d’essais cliniques ou de registres prospectifs."}); idx += 1
+        options.append({"label": f"Option {idx} : Thérapie focale****", "degre": "faible", "details": "**** Dans le cadre d’essais cliniques ou de registres prospectifs."}); idx += 1
+        notes = [
+            "** Possibilité de RT stéréotaxique 35–40 Gy en 5 séances.",
+            "*** Watchful waiting si EV limitée / non éligible autres options.",
+            "**** Cryo/HIFU/Thérapie focale uniquement en essais/registries.",
+        ]
+
+    elif risque == "intermédiaire":
+        options.append({"label": f"Option {idx} : Prostatectomie totale (+/− curage pelvien étendu*)", "degre": "fort", "details": "* En fonction des estimateurs du risque d’envahissement ganglionnaire."}); idx += 1
+        options.append({"label": f"Option {idx} : Radiothérapie externe (74–80 Gy en 37–40 séances ou 60 Gy en 20 séances)** +/− hormonothérapie courte (4 à 6 mois)***", "degre": "fort", "details": "** Possibilité RT stéréotaxique 35–40 Gy en 5 séances ; *** HT courte si risque intermédiaire défavorable."}); idx += 1
+        options.append({"label": f"Option {idx} : Radiothérapie avec boost de curiethérapie***", "degre": "fort", "details": "*** Si risque intermédiaire défavorable."}); idx += 1
+        options.append({"label": f"Option {idx} : Curiethérapie (si risque intermédiaire favorable uniquement)", "degre": "moyen", "details": "Réservée aux profils intermédiaires favorables."}); idx += 1
+        options.append({"label": f"Option {idx} : Surveillance active****", "degre": "faible", "details": "**** Si faible volume tumoral, faible pourcentage d’ISUP 2 et faible densité de PSA."}); idx += 1
+        options.append({"label": f"Option {idx} : Surveillance simple ***** (Watchfull waiting)", "degre": "moyen", "details": "***** Pour patients non éligibles aux autres options avec probabilité de survie courte."}); idx += 1
+        options.append({"label": f"Option {idx} : Cryothérapie et HIFU******", "degre": "faible", "details": "****** Uniquement essais cliniques / registres prospectifs."}); idx += 1
+        options.append({"label": f"Option {idx} : Thérapie focale ******", "degre": "faible", "details": "****** Uniquement essais cliniques / registres prospectifs."}); idx += 1
+        notes = [
+            "** RT stéréotaxique 35–40 Gy en 5 fractions possible.",
+            "*** 'Défavorables' = selon critères locaux (ex: ISUP3, % biopsies+, PSA proche 20).",
+        ]
+
+    else:  # élevé
+        options.append({"label": f"Option {idx} : Radio-hormonothérapie* : radiothérapie externe et hormonothérapie longue (18–36 mois)", "degre": "fort", "details": "* Autre option : radio-hormonothérapie avec boost de curiethérapie."}); idx += 1
+        if _is_vhr_stampede(cT, isup, psa):
+            options.append({"label": f"Option {idx} : Intensification par 2 ans d’acétate d’abiratérone (très haut risque non métastatique)**", "degre": "fort", "details": "** STAMPEDE : cN+ OU ≥2 parmi PSA>40, ISUP≥4, ≥cT3."}); idx += 1
+        options.append({"label": f"Option {idx} : Prostatectomie totale, avec curage ganglionnaire pelvien +/− traitement adjuvant", "degre": "fort", "details": "Voie chirurgicale avec stratégies adjuvantes selon résultats postop."}); idx += 1
+        options.append({"label": f"Sous-branche : si pT3 ou R1 → Surveillance biologique rapprochée et radiothérapie de rattrapage précoce en cas de récidive biologique", "degre": "fort", "details": "Initier RT salvage précocement si critère atteint."}); idx += 1
+        options.append({"label": f"Sous-branche : si pN1 → HT adjuvante / RT pelvienne associée à une HT / Surveillance si faible envahissement ganglionnaire", "degre": "fort", "details": "Choix selon charge ganglionnaire et comorbidités."}); idx += 1
+        options.append({"label": f"Sous-branche : si PSA post-opératoire détectable → Radiothérapie adjuvante +/− HT associée", "degre": "fort", "details": "Indication à discuter en RCP."}); idx += 1
+        notes = [
+            "** Très haut risque (STAMPEDE) : cN+ OU ≥2 critères parmi PSA>40, ISUP≥4, ≥cT3.",
+        ]
+
+    donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", normalize_cT(cT)), ("Espérance de vie", f"{esperance_vie_ans} ans")]
+    return {"donnees": donnees, "risque": risque, "options": options, "notes": notes}
+
+
+def recommend_from_patient_strict(patient: PatientPCa, *, contexte: Dict[str, Any]) -> Dict[str, Any]:
+    """Variante qui force l'usage du plan localisé strict D'Amico basé sur les images fournies."""
+    setting = contexte.get("setting")
+    if setting == "localise":
+        ev = contexte.get("esperance_vie_ans", patient.life_expectancy_years or 10)
+        return plan_prostate_localise_damico_strict(psa=patient.psa, isup=int(patient.grade_group), cT=patient.clinical_t.value, esperance_vie_ans=int(ev))
+    elif setting == "recidive":
+        return plan_prostate_recidive(
+            type_initial=contexte.get("type_initial", "Prostatectomie"),
+            psa_actuel=patient.psa,
+            psa_nadir_post_rt=contexte.get("psa_nadir_post_rt"),
+            confirmations=int(contexte.get("confirmations", 2))
+        )
+    elif setting == "metastatique":
+        return plan_prostate_metastatique(
+            testosterone_castration=bool(contexte.get("testosterone_castration", False)),
+            volume_eleve=bool(contexte.get("volume_eleve", False)),
+            symptomes_osseux=bool(contexte.get("symptomes_osseux", False)),
+            deja_docetaxel=bool(contexte.get("deja_docetaxel", False)),
+            deja_arpi=bool(contexte.get("deja_arpi", False)),
+            alteration_HRR=bool(contexte.get("alteration_HRR", False)),
+        )
+    else:
+        raise ValueError("contexte['setting'] doit être 'localise', 'recidive' ou 'metastatique'.")
+
 
 # =========================
 # LOGIQUE CLINIQUE — REIN (localisé, métastatique, biopsie)
