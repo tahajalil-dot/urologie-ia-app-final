@@ -679,38 +679,36 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
 
     if risque == "faible":
         options.append({
-            "label": "Surveillance active",
+            "label": "Surveillance active.",
             "degre": "fort",
-            "details": "Bas risque pur ; suivi structuré (PSA / IRM / biopsies) pour éviter le sur‑traitement."
+            "details": "Bas risque pur ; suivi structuré (PSA / IRM / biopsies) pour éviter le sur‑traitement,."
         })
         options.append({
             "label": "Prostatectomie totale",
-            "degre": "moyen",
+            "degre": "Fort",
             "details": "Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Radiothérapie externe",
-            "degre": "moyen",
-            "details": "74–80 Gy (37–40 séances) ou 60 Gy (20 séances) ; stéréotaxie 35–40 Gy (5 séances) possible."
+            "degre": "fort",
+            "details": "74–80 Gy (37–40 séances) ou 60 Gy (20 séances) ; stéréotaxie 35–40 Gy (5 séances) possible ( recommendation faible) ,Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Curiethérapie",
-            "degre": "moyen",
-            "details": "Option locale si éligible."
+            "degre": "fort",
+            "details": "Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Abstention – Surveillance (watchful waiting)",
-            "degre": "moyen",
+            "degre": "fort",
             "details": "Si espérance de vie limitée ou non éligible aux autres options."
         })
         options.append({
             "label": "Cryothérapie ou HIFU",
-            "degre": "faible",
             "details": "Plutôt dans le cadre d’essais cliniques / registres prospectifs."
         })
         options.append({
             "label": "Thérapie focale",
-            "degre": "faible",
             "details": "Plutôt dans le cadre d’essais cliniques / registres prospectifs."
         })
 
@@ -723,16 +721,16 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
         options.append({
             "label": "Radiothérapie externe +/− hormonothérapie courte (4 à 6 mois)",
             "degre": "fort",
-            "details": "74–80 Gy (37–40) ou 60 Gy (20) ; stéréotaxie 35–40 Gy (5) possible ; HT courte si profil défavorable."
+            "details": "74–80 Gy (37–40) ou 60 Gy (20) ; Radiotherapie seule si risque intermediaire favorable ; HT courte si risque intermediaire défavorable."
         })
         options.append({
             "label": "Radiothérapie avec boost de curiethérapie",
-            "degre": "fort",
+            "degre": "faible",
             "details": "À privilégier en cas d’intermédiaire défavorable."
         })
         options.append({
             "label": "Curiethérapie (intermédiaire favorable uniquement)",
-            "degre": "moyen",
+            "degre": "fort",
             "details": "Réservée aux profils intermédiaires favorables."
         })
         options.append({
@@ -742,17 +740,15 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
         })
         options.append({
             "label": "Surveillance simple (watchful waiting)",
-            "degre": "moyen",
+            "degre": "fort",
             "details": "Si probabilité de survie courte / non éligible aux autres options."
         })
         options.append({
             "label": "Cryothérapie ou HIFU",
-            "degre": "faible",
             "details": "Plutôt dans le cadre d’essais cliniques / registres prospectifs."
         })
         options.append({
             "label": "Thérapie focale",
-            "degre": "faible",
             "details": "Plutôt dans le cadre d’essais cliniques / registres prospectifs."
         })
 
@@ -760,7 +756,7 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
         options.append({
             "label": "Radiothérapie externe + hormonothérapie prolongée (18–36 mois)",
             "degre": "fort",
-            "details": "Schéma de référence (radio‑hormonothérapie)."
+            "details": "autre option : Rx + HT avec BOOST de curiethérapieSchéma de référence (radio‑hormonothérapie)."
         })
         # Intensification très haut risque non métastatique
         if _is_vhr_stampede(cT, isup, psa):
@@ -776,21 +772,18 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
         })
         options.append({
             "label": "Si pT3 ou R1 : radiothérapie de rattrapage précoce en cas de récidive biologique",
-            "degre": "fort",
             "details": "Surveillance PSA rapprochée ; initier tôt si critères atteints."
         })
         options.append({
             "label": "Si pN1 : HT adjuvante / RT pelvienne + HT / surveillance (faible envahissement)",
-            "degre": "fort",
             "details": "Choix selon charge ganglionnaire et comorbidités."
         })
         options.append({
             "label": "Si PSA post‑op détectable : radiothérapie adjuvante +/− HT",
-            "degre": "fort",
             "details": "À discuter en RCP selon contexte."
         })
 
-    note_unique = "La stratégie thérapeutique doit être discutée en réunion de concertation pluridisciplinaire et décidée avec le patient après une information claire et partagée."
+    note_unique = "La stratégie thérapeutique doit être discutée en réunion de concertation pluridisciplinaire et décidée avec le patient après une information claire et partagée,INFORMER LE PATIENT DE L'ENSEMBLE DES EFFETS SECONDAIRES DES DIFFÉRENTS TRAITEMENTS DANS LE CADRE D'UNE CONSULTATION D'ANNONCE DÉDIÉE, ET ENCOURAGER UNE ÉVALUATION MULTIDISCIPLINAIRE (UROLOGUE, ONCOLOGUE RADIOTHÉRAPEUTE)"
 
     donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", normalize_cT(cT)), ("Espérance de vie", f"{esperance_vie_ans} ans")]
     return {"donnees": donnees, "risque": risque, "options": options, "notes": [note_unique]}
