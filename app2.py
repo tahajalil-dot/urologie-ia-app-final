@@ -2931,7 +2931,7 @@ def render_prostate_localise_page():
         render_kv_table("📊 Stratification", [("Risque", plan["risque"].upper())], "Élément", "Résultat")
         st.markdown("### 💊 Options de traitement")
         for x in plan["options"]:
-            st.markdown(f"- **{x['label']}** — *niveau de reco : {x['degre']}*  \n  {x['details']}")
+            st.markdown(f"- **{x['label']}** : {x['details']}")
         if plan["notes"]:
             st.markdown("### 📝 Notes")
             for n in plan["notes"]:
