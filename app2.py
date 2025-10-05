@@ -783,7 +783,7 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
             "details": "À discuter en RCP selon contexte."
         })
 
-    note_unique = "La stratégie thérapeutique doit être discutée en réunion de concertation pluridisciplinaire et décidée avec le patient après une information claire et partagée,INFORMER LE PATIENT DE L'ENSEMBLE DES EFFETS SECONDAIRES DES DIFFÉRENTS TRAITEMENTS DANS LE CADRE D'UNE CONSULTATION D'ANNONCE DÉDIÉE, ET ENCOURAGER UNE ÉVALUATION MULTIDISCIPLINAIRE (UROLOGUE, ONCOLOGUE RADIOTHÉRAPEUTE)"
+    note_unique = "La stratégie thérapeutique doit être discutée en réunion de concertation pluridisciplinaire et décidée avec le patient après une information claire et partagée des effets de chaque traitement ."
 
     donnees = [("PSA", f"{psa:.2f} ng/mL"), ("ISUP", isup), ("cT", normalize_cT(cT)), ("Espérance de vie", f"{esperance_vie_ans} ans")]
     return {"donnees": donnees, "risque": risque, "options": options, "notes": [note_unique]}
