@@ -680,27 +680,22 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
     if risque == "faible":
         options.append({
             "label": "Surveillance active.",
-            "degre": "fort",
             "details": "Bas risque pur ; suivi structuré (PSA / IRM / biopsies) pour éviter le sur‑traitement,."
         })
         options.append({
             "label": "Prostatectomie totale",
-            "degre": "Fort",
             "details": "Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Radiothérapie externe",
-            "degre": "fort",
             "details": "74–80 Gy (37–40 séances) ou 60 Gy (20 séances) ; stéréotaxie 35–40 Gy (5 séances) possible ( recommendation faible) ,Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Curiethérapie",
-            "degre": "fort",
             "details": "Alternative si refus/non‑éligibilité à la surveillance active."
         })
         options.append({
             "label": "Abstention – Surveillance (watchful waiting)",
-            "degre": "fort",
             "details": "Si espérance de vie limitée ou non éligible aux autres options."
         })
         options.append({
@@ -715,32 +710,26 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
     elif risque == "intermédiaire":
         options.append({
             "label": "Prostatectomie totale (+/− curage pelvien étendu)",
-            "degre": "fort",
             "details": "En fonction des estimateurs du risque d’envahissement ganglionnaire."
         })
         options.append({
             "label": "Radiothérapie externe +/− hormonothérapie courte (4 à 6 mois)",
-            "degre": "fort",
             "details": "74–80 Gy (37–40) ou 60 Gy (20) ; Radiotherapie seule si risque intermediaire favorable ; HT courte si risque intermediaire défavorable."
         })
         options.append({
             "label": "Radiothérapie avec boost de curiethérapie",
-            "degre": "faible",
             "details": "À privilégier en cas d’intermédiaire défavorable."
         })
         options.append({
             "label": "Curiethérapie (intermédiaire favorable uniquement)",
-            "degre": "fort",
             "details": "Réservée aux profils intermédiaires favorables."
         })
         options.append({
             "label": "Surveillance active",
-            "degre": "faible",
             "details": "Si faible volume tumoral, faible % d’ISUP 2 et faible densité de PSA."
         })
         options.append({
             "label": "Surveillance simple (watchful waiting)",
-            "degre": "fort",
             "details": "Si probabilité de survie courte / non éligible aux autres options."
         })
         options.append({
@@ -755,19 +744,16 @@ def plan_prostate_localise(psa: float, isup: int, cT: str, esperance_vie_ans: in
     else:  # élevé / localement avancé
         options.append({
             "label": "Radiothérapie externe + hormonothérapie prolongée (18–36 mois)",
-            "degre": "fort",
             "details": "autre option : Rx + HT avec BOOST de curiethérapieSchéma de référence (radio‑hormonothérapie)."
         })
         # Intensification très haut risque non métastatique
         if _is_vhr_stampede(cT, isup, psa):
             options.append({
                 "label": "Intensification par acétate d’abiratérone pendant 2 ans",
-                "degre": "fort",
                 "details": "Si très haut risque non métastatique (cN+ ou ≥2 : PSA>40, ISUP≥4, ≥cT3)."
             })
         options.append({
             "label": "Prostatectomie totale avec curage pelvien +/− traitement adjuvant",
-            "degre": "fort",
             "details": "Décision selon résultats anatomopathologiques et facteurs de risque."
         })
         options.append({
@@ -2954,7 +2940,7 @@ def render_prostate_localise_page():
         sections = {
             "Données": [f"{k}: {v}" for k, v in plan["donnees"]],
             "Stratification": [f"Risque : {plan['risque'].upper()}"],
-            "Options": [f"{o['label']} — {o['degre']} : {o['details']}" for o in plan["options"]],
+            "Options": [f"{o['label']} : {o['details']}" for o in plan["options"]],
             "Notes": plan["notes"],
         }
         report_text = build_report_text("CAT Prostate Localisée", sections)
